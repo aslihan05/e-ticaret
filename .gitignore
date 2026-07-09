@@ -1,0 +1,18 @@
+# .NET build output
+bin/
+obj/
+*.user
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# Rider
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
