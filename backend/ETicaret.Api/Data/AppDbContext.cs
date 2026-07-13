@@ -6,7 +6,7 @@ namespace ETicaret.Api.Data;
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options)
+        : base(options)   // options: "hangi veritabınına, hangi bağlantıyla? bilgisi buraya gelir."
     {
     }
 
@@ -40,3 +40,5 @@ public class AppDbContext : DbContext
     }
 
 }
+
+// DbContex C# ile SQL arasındaki tercümanın sözlüğü.

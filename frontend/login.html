@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş - E-Ticaret</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <main class="login-page">
+
+    <section class="brand-panel">
+        <h1>E-TİCARET</h1>
+        <p>Aradığın her şey, tek adreste.</p>
+    </section>
+
+    <section class="login-panel">
+        <form id="login-form" class="login-card">
+            <h1>GİRİŞ YAP</h1>
+            <p id="message"></p>
+
+            <label for="username">Kullanıcı Adı</label>
+            <input type="text" id="username" required>
+
+            <label for="password">Şifre</label>
+            <input type="password" id="password" required>
+
+            <button type="submit">GİRİŞ YAP</button>
+
+            <p class="form-link">Hesabın yok mu?</p>
+            <a href="register.html" class="btn-secondary">KAYIT OL</a>
+        </form>
+    </section>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+
+</body>
+</html>

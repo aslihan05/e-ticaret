@@ -1,0 +1,131 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.login-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.brand-panel {
+    background-image: url("../images/pexels-umudicreative-18046813.jpg");
+    background-size: cover;
+    background-position: center;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+    padding: 40px;
+}
+
+.brand-panel h1 {
+    color: rgb(255, 232, 162);
+    font-size: 2.5rem;
+}
+
+.brand-panel p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.login-panel {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    background-color: rgba(255, 232, 162, 0.8);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+}
+
+.login-card h1 {
+    font-size: 1.8rem;
+    margin-bottom: 24px;
+}
+
+.login-card label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+.login-card input {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.login-card input:focus {
+    outline: none;
+    border-color: rgb(255, 232, 162);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+
+.login-card button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: white;
+    color: #1e1b4b;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.login-card button:hover {
+    background: rgb(255, 232, 50);
+}
+
+.login-card button:active {
+    transform: scale(0.98);
+}
+
+#message {
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: #dc2626;
+}
+
+.login-panel h1 {
+    color: #1e1b4b;
+    text-align: center;
+}
+
+.form-link {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.btn-secondary {
+    display: block;
+    padding: 12px;
+    margin-top: 8px;
+    border: 2px solid #1e1b4b;
+    border-radius: 8px;
+    text-align: center;
+    color: #1e1b4b;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: white;
+}

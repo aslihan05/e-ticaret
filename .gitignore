@@ -7,6 +7,13 @@ obj/
 .vs/
 .vscode/
 
+# Claude Code (yerel araç ayarları)
+.claude/
+
+# Kişisel çalışma dosyaları (repoya girmez)
+GELISTIRME-GUNLUGU.md
+e-ticaret.jpeg
+
 # Rider
 .idea/
 

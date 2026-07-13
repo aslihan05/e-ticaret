@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Ticaret</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
+        <input type="text" id="search" placeholder="Ürün ara...">
+        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout">
+        <section class="banner">
+            <div class="banner-text">
+                <h2>Sezon indirimi başladı!</h2>
+                <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
+                <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
+            </div>
+        </section>
+
+        <aside>
+            <h2>Kategoriler</h2>
+            <ul id="category-list"></ul>
+        </aside>
+
+        <main>
+            <div class="toolbar">
+                <h2 id="list-title">Tüm Ürünler</h2>
+                <select id="sort">
+                    <option value="default">Önerilen</option>
+                    <option value="price-asc">Fiyat: Düşükten Yükseğe</option>
+                    <option value="price-desc">Fiyat: Yüksekten Düşüğe</option>
+                </select>
+            </div>
+            <div id="product-grid"></div>
+        </main>
+    </div>
+
+    <footer>
+        <p>E-Ticaret - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/home.js"></script>
+</body>
+</html>

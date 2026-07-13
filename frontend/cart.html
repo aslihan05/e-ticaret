@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sepetim - E-Ticaret</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
+        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout">
+        <main class="cart-page">
+            <h2>SEPETİM</h2>
+            <p id="message"></p>
+            <div id="cart-items"></div>
+            <div class="cart-summary">
+                <strong>Toplam: <span id="cart-total">0 TL</span></strong>
+                <button id="checkout-btn" class="add-btn">Siparişi Tamamla</button>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        <p>E-Ticaret - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/cart.js"></script>
+</body>
+</html>

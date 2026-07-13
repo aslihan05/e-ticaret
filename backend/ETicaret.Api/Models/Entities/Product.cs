@@ -11,7 +11,12 @@ public class Product
     
     
     public bool IsActive {get; set; } = true;
+    // Silmek yerine pasife çekme imkanı.
+    // Productscontroller'ın sadece aktifleri listelemesi.
 
     public int CategoryId { get; set; }
     public Category Category { get; set; } = null!;
 }
+
+
+// Kataloğun merkezi.
