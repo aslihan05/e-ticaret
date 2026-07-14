@@ -35,12 +35,26 @@ public class CartController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> AddToCart(CartItemDto dto)
     {
+        var product = await _context.Products.FindAsync(dto.ProductId);
+        if (product == null || !product.IsActive)
+        {
+            return BadRequest(new { message = "Ürün bulunamadı." });
+        }
+
         var existing = await _context.CartItems
             .FirstOrDefaultAsync(c => c.UserId == CurrentUserId && c.ProductId == dto.ProductId);
 
+        int newQuantity = (existing?.Quantity ?? 0) + dto.Quantity;
+
+        // Sepetteki toplam adet stoğu aşamaz
+        if (newQuantity > product.Stock)
+        {
+            return BadRequest(new { message = $"Stokta yalnızca {product.Stock} adet var." });
+        }
+
         if (existing != null)
         {
-            existing.Quantity += dto.Quantity;
+            existing.Quantity = newQuantity;
         }
         else
         {
@@ -53,18 +67,25 @@ public class CartController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
-        return Ok();
+        // remaining: bu üründen sepete daha kaç adet eklenebilir (0 -> "Tükendi")
+        return Ok(new { remaining = product.Stock - newQuantity });
     }
 
     [HttpPut("{id}")]
 public async Task<IActionResult> UpdateQuantity(int id, CartItemDto dto)
 {
     var item = await _context.CartItems
+        .Include(c => c.Product)
         .FirstOrDefaultAsync(c => c.Id == id && c.UserId == CurrentUserId);
 
     if (item == null)
     {
         return NotFound();
+    }
+
+    if (dto.Quantity > item.Product.Stock)
+    {
+        return BadRequest(new { message = $"Stokta yalnızca {item.Product.Stock} adet var." });
     }
 
     item.Quantity = dto.Quantity;

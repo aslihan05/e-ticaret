@@ -25,6 +25,19 @@ public class AppDbContext : DbContext
 
      protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Para alanlarının veritabanı hassasiyeti: toplam 18 basamak, virgülden sonra 2.
+        // Açıkça belirtilmezse EF Core "silently truncated" uyarısı verir.
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.Property(p => p.Price).HasPrecision(18, 2);
+            entity.Property(p => p.DiscountPrice).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<OrderItem>(entity =>
+        {
+            entity.Property(oi => oi.UnitPrice).HasPrecision(18, 2);
+        });
+
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasOne(o => o.User)

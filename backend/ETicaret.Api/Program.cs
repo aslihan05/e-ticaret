@@ -65,7 +65,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Yerel geliştirmede HTTP kullanıyoruz; HTTPS portu tanımlı olmadığı için
+// UseHttpsRedirection sadece uyarı üretiyordu, bu yüzden kaldırıldı.
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseMiddleware<LoggingMiddleware>();

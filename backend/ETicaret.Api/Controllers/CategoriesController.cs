@@ -37,6 +37,21 @@ public class CategoriesController : ControllerBase
         return Ok(category);
     }
 
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Update(int id, CategoryDto dto)
+    {
+        var category = await _context.Categories.FindAsync(id);
+        if (category == null)
+        {
+            return NotFound();
+        }
+
+        category.Name = dto.Name;
+        await _context.SaveChangesAsync();
+        return Ok(category);
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
