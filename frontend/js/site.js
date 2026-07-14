@@ -3,7 +3,12 @@ function setupNav() {
     const username = localStorage.getItem("username");
 
     if (username) {
+        const adminLink = localStorage.getItem("role") === "Admin"
+            ? `<a href="admin.html">Yönetim</a>`
+            : "";
         nav.innerHTML = `
+            ${adminLink}
+            <a href="orders.html">Siparişlerim</a>
             <span>Merhaba, ${username}</span>
             <a href="#" id="logout-link">Çıkış Yap</a>`;
 
@@ -46,9 +51,16 @@ async function addToCart(productId, button) {
     button.disabled = true;
 
     try {
-        await apiPost("/cart", { productId: productId, quantity: 1 });
-        button.textContent = "Eklendi ✓";
+        const data = await apiPost("/cart", { productId: productId, quantity: 1 });
         await updateCartCount();
+
+        // Sepete eklenebilecek stok bittiyse buton anında "Tükendi" olur
+        if (data?.remaining === 0) {
+            button.textContent = "Tükendi";
+            return;
+        }
+
+        button.textContent = "Eklendi ✓";
         setTimeout(() => {
             button.textContent = oldText;
             button.disabled = false;

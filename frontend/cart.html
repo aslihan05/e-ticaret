@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sepetim - E-Ticaret</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        if (!localStorage.getItem("token")) {
+            window.location.replace("login.html");
+        }
+    </script>
 </head>
 <body>
     <header>
@@ -15,6 +20,7 @@
 
     <div class="layout">
         <main class="cart-page">
+            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
             <h2>SEPETİM</h2>
             <p id="message"></p>
             <div id="cart-items"></div>

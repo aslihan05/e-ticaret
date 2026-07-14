@@ -17,15 +17,24 @@
     <div class="layout">
         <section class="banner">
             <div class="banner-text">
-                <h2>Sezon indirimi başladı!</h2>
+                <h2>Sezon indirimi başladı! 🔥</h2>
                 <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
                 <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
             </div>
+            <div id="sale-strip" class="sale-strip"></div>
         </section>
 
         <aside>
             <h2>Kategoriler</h2>
             <ul id="category-list"></ul>
+
+            <h2 class="filter-title">Fiyat Aralığı</h2>
+            <div class="price-filter">
+                <input type="number" id="price-min" placeholder="Min" min="0">
+                <input type="number" id="price-max" placeholder="Max" min="0">
+            </div>
+            <button id="price-apply" class="add-btn filter-apply">Uygula</button>
+            <button id="price-clear" class="filter-clear">Temizle</button>
         </aside>
 
         <main>

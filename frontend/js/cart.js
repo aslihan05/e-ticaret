@@ -4,6 +4,7 @@ if (!localStorage.getItem("token")) {
 
 async function loadCart() {
     const items = await apiGet("/cart");
+    console.log("Sepet Verisi:", items);
     const container = document.getElementById("cart-items");
     const summary = document.querySelector(".cart-summary");
     container.innerHTML = "";
@@ -15,23 +16,39 @@ async function loadCart() {
     }
     summary.style.display = "flex";
 
+    // Sepette indirimli fiyat gösterilir; asıl fiyatı sipariş anında backend belirler
+    const unitPrice = (prod) => {
+        const now = new Date();
+        const active = prod.discountPrice != null && prod.discountPrice < prod.price
+            && (!prod.discountStart || new Date(prod.discountStart) <= now)
+            && (!prod.discountEnd || new Date(prod.discountEnd) >= now);
+        return active ? prod.discountPrice : prod.price;
+    };
+
     let total = 0;
     for (const item of items) {
-        total += item.product.price * item.quantity;
+        const price = unitPrice(item.product);
+        total += price * item.quantity;
+        const priceLabel = price < item.product.price
+            ? `<span class="price-old">${item.product.price} TL</span> <span class="price-new">${price} TL</span>`
+            : `${price} TL`;
         const row = document.createElement("div");
         row.className = "cart-item";
         row.innerHTML = `
             <img src="${item.product.imageUrl}" alt="${item.product.name}">
             <div class="cart-item-info">
                 <h3>${item.product.name}</h3>
-                <span>${item.product.price} TL</span>
+                <span>${priceLabel}</span>
             </div>
-            <div class="qty-controls">
+           <div class="qty-controls">
                 <button class="qty-btn" data-id="${item.id}" data-qty="${item.quantity - 1}">−</button>
                 <span>${item.quantity}</span>
-                <button class="qty-btn" data-id="${item.id}" data-qty="${item.quantity + 1}">+</button>
+                <button class="qty-btn" 
+                        data-id="${item.id}" 
+                        data-qty="${item.quantity + 1}"
+                        ${item.quantity >= item.product.stock ? "disabled title='Stok sınırına ulaştınız'" : ""}>+</button>
             </div>
-            <strong>${item.product.price * item.quantity} TL</strong>
+            <strong>${price * item.quantity} TL</strong>
             <button class="remove-btn" data-id="${item.id}">🗑</button>`;
         container.appendChild(row);
     }

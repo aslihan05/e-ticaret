@@ -43,5 +43,7 @@ async function apiDelete(path) {
         method: "DELETE",
         headers: authHeaders()
     });
-    if (!response.ok) throw new Error(`İstek başarısız: ${response.status}`);
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.message ?? `İstek başarısız: ${response.status}`);
+    return data;
 }

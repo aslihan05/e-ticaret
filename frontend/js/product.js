@@ -10,7 +10,7 @@ async function loadProduct() {
 
     try {
         const p = await apiGet(`/products/${id}`);
-        const outOfStock = p.stock === 0;
+        const outOfStock = !p.inStock;
         document.title = `${p.name} - E-Ticaret`;
 
         container.innerHTML = `
@@ -23,8 +23,10 @@ async function loadProduct() {
                 <span class="detail-category">${p.category?.name ?? ""}</span>
                 <h2>${p.name}</h2>
                 <p class="detail-desc">${p.description ?? ""}</p>
-                <div class="detail-price">${p.price} TL</div>
-                <p class="detail-stock">${outOfStock ? "Stokta yok" : `Stok: ${p.stock} adet`}</p>
+                <div class="detail-price">${p.hasDiscount
+                    ? `<span class="price-old">${p.price} TL</span> <span class="price-new">${p.discountedPrice} TL</span>`
+                    : `${p.price} TL`}</div>
+                <p class="detail-stock">${outOfStock ? "Stokta yok" : "Stokta var ✓"}</p>
                 <button class="add-btn" data-id="${p.id}" ${outOfStock ? "disabled" : ""}>
                     ${outOfStock ? "Tükendi" : "Sepete Ekle"}
                 </button>
