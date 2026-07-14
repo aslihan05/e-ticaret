@@ -11,4 +11,8 @@ public class OrderItem
 
     public int Quantity {get; set; }
     public decimal UnitPrice {get; set;}   // Sipariş anındaki fiyatın anlık görüntüsüdür.
+
+    // Kalem bazında karar: admin siparişin bir kısmını onaylayıp bir kısmını reddedebilir.
+    // Aynı enum kullanılır; kalemler için sadece Pending/Approved/Rejected anlamlıdır.
+    public OrderStatus Status { get; set; } = OrderStatus.Pending;
 }

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siparişlerim - E-Ticaret</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        if (!localStorage.getItem("token")) {
+            window.location.replace("login.html");
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
+        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout">
+        <main class="orders-page">
+            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
+            <h2>SİPARİŞLERİM</h2>
+            <div id="orders-list"></div>
+        </main>
+    </div>
+
+    <footer>
+        <p>E-Ticaret - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/orders.js"></script>
+</body>
+</html>

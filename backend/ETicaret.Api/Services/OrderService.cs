@@ -32,13 +32,15 @@ public class OrderService
             CreatedAt = DateTime.UtcNow
         };
 
+        var now = DateTime.Now;
         foreach (var item in cartItems)
         {
             order.OrderItems.Add(new OrderItem
             {
                 ProductId = item.ProductId,
                 Quantity = item.Quantity,
-                UnitPrice = item.Product.Price
+                // İndirim aktifse sipariş indirimli fiyattan kesilir
+                UnitPrice = item.Product.EffectivePrice(now)
             });
         }
 
@@ -60,37 +62,106 @@ public class OrderService
             .ToListAsync();
     }
 
+    // Kalem bazında karar: approvedItemIds içindekiler onaylanır, kalanlar reddedilir.
+    // Hiç onaylanan yoksa sipariş Rejected, en az bir kalem onaylıysa Approved olur.
+    public async Task DecideOrderAsync(int orderId, List<int> approvedItemIds, int adminUserId)
+    {
+        var order = await _context.Orders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+
+        if (order == null)
+        {
+            throw new Exception("Sipariş bulunamadı.");
+        }
+
+        if (order.Status != OrderStatus.Pending)
+        {
+            throw new Exception("Bu sipariş zaten işleme alınmış.");
+        }
+
+        var approved = order.OrderItems.Where(i => approvedItemIds.Contains(i.Id)).ToList();
+
+        // Önce onaylanacak kalemlerin stoğu yetiyor mu kontrol et, sonra düş
+        foreach (var item in approved)
+        {
+            if (item.Product.Stock < item.Quantity)
+            {
+                throw new Exception($"Stok yetersiz: {item.Product.Name} (stokta {item.Product.Stock}, sipariş {item.Quantity}).");
+            }
+        }
+
+        foreach (var item in order.OrderItems)
+        {
+            if (approved.Contains(item))
+            {
+                item.Status = OrderStatus.Approved;
+                item.Product.Stock -= item.Quantity;
+            }
+            else
+            {
+                item.Status = OrderStatus.Rejected;
+            }
+        }
+
+        order.Status = approved.Count > 0 ? OrderStatus.Approved : OrderStatus.Rejected;
+        order.ApprovedAt = DateTime.UtcNow;
+        order.ApprovedBy = adminUserId;
+
+        await _context.SaveChangesAsync();
+    }
+
     public async Task ApproveOrderAsync(int orderId, int adminUserId)
+    {
+        var itemIds = await _context.OrderItems
+            .Where(i => i.OrderId == orderId)
+            .Select(i => i.Id)
+            .ToListAsync();
+
+        await DecideOrderAsync(orderId, itemIds, adminUserId);
+    }
+
+    public async Task RejectOrderAsync(int orderId, int adminUserId)
+    {
+        await DecideOrderAsync(orderId, new List<int>(), adminUserId);
+    }
+
+    // Sadece sonuçlanmış (Reddedildi/Teslim Edildi) siparişler silinebilir
+    public async Task DeleteOrderAsync(int orderId)
+    {
+        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderId);
+
+        if (order == null)
+        {
+            throw new Exception("Sipariş bulunamadı.");
+        }
+
+        if (order.Status != OrderStatus.Rejected && order.Status != OrderStatus.Delivered)
+        {
+            throw new Exception("Sadece reddedilmiş veya teslim edilmiş siparişler silinebilir.");
+        }
+
+        _context.Orders.Remove(order);
+        await _context.SaveChangesAsync();
+    }
+
+// Genel durum güncelleme: Onay/Red mevcut kuralları kullanır;
+// Kargoda ve Teslim Edildi sadece doğru sıradan geçilebilir.
+public async Task UpdateStatusAsync(int orderId, OrderStatus newStatus, int adminUserId)
 {
-    var order = await _context.Orders
-        .Include(o => o.OrderItems)
-            .ThenInclude(oi => oi.Product)
-        .FirstOrDefaultAsync(o => o.Id == orderId);
-
-    if (order == null)
+    if (newStatus == OrderStatus.Approved)
     {
-        throw new Exception("Sipariş bulunamadı.");
+        await ApproveOrderAsync(orderId, adminUserId);
+        return;
     }
 
-    if (order.Status != OrderStatus.Pending)
+    if (newStatus == OrderStatus.Rejected)
     {
-        throw new Exception("Bu sipariş zaten işleme alınmış.");
+        await RejectOrderAsync(orderId, adminUserId);
+        return;
     }
 
-    foreach (var item in order.OrderItems)
-    {
-        item.Product.Stock -= item.Quantity;
-    }
-
-    order.Status = OrderStatus.Approved;
-    order.ApprovedAt = DateTime.UtcNow;
-    order.ApprovedBy = adminUserId;
-
-    await _context.SaveChangesAsync();
-}
-
-public async Task RejectOrderAsync(int orderId, int adminUserId)
-{
     var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderId);
 
     if (order == null)
@@ -98,15 +169,16 @@ public async Task RejectOrderAsync(int orderId, int adminUserId)
         throw new Exception("Sipariş bulunamadı.");
     }
 
-    if (order.Status != OrderStatus.Pending)
+    bool validTransition =
+        (newStatus == OrderStatus.Shipped && order.Status == OrderStatus.Approved) ||
+        (newStatus == OrderStatus.Delivered && order.Status == OrderStatus.Shipped);
+
+    if (!validTransition)
     {
-        throw new Exception("Bu sipariş zaten işleme alınmış.");
+        throw new Exception("Geçersiz durum geçişi.");
     }
 
-    order.Status = OrderStatus.Rejected;
-    order.ApprovedAt = DateTime.UtcNow;
-    order.ApprovedBy = adminUserId;
-
+    order.Status = newStatus;
     await _context.SaveChangesAsync();
 }
 

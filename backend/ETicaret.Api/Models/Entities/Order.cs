@@ -4,7 +4,9 @@ public enum OrderStatus    // enum geçerli değerleri derleyiciye denetletir
 {
     Pending,  // OrderStatus.Pending ile her sipariş taslaktaki kurala uygun olarak "onay bekliyor" doğar.
     Approved,
-    Rejected
+    Rejected,
+    Shipped,   // Kargoya verildi
+    Delivered  // Teslim edildi
 }
 
 public class Order
