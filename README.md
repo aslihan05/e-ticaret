@@ -5,10 +5,10 @@
 ## Özellikler
 
 - **Kullanıcı sistemi**: Kayıt ve giriş sayfaları, JWT tabanlı kimlik doğrulama, rol bazlı yetkilendirme (Admin / Customer)
-- **Vitrin**: Ürün listeleme, canlı arama, kategoriye göre filtreleme, fiyata göre sıralama, ürün detay sayfası
+- **Vitrin**: Ürün listeleme, canlı arama, kategoriye göre filtreleme, fiyata göre sıralama, ürün detay sayfası, **süreli indirim** (indirimli fiyat + başlangıç/bitiş tarihi)
 - **Sepet**: Sepete ekleme (JWT korumalı), adet güncelleme, satır silme, sepet rozeti
-- **Sipariş akışı**: Sepetten sipariş oluşturma (checkout), sipariş anındaki fiyatın saklanması; siparişler admin onayına düşer, **onayda stok otomatik düşer**
-- **Admin API**: Sipariş onaylama/reddetme, kullanıcı yönetimi, istek logları, satış istatistikleri (panel arayüzü geliştirme aşamasında)
+- **Sipariş akışı**: Sepetten sipariş oluşturma (checkout), sipariş anındaki fiyatın saklanması; siparişler admin onayına düşer, **onayda stok otomatik düşer**; kullanıcı **sipariş geçmişi** sayfasından durumunu takip eder
+- **Admin paneli**: Sipariş onaylama/reddetme, kullanıcı yönetimi, istek logları, satış istatistikleri — hepsi `admin.html` arayüzünden yönetilir
 - **Loglama**: Değişiklik yapan tüm isteklerin middleware ile otomatik kaydı
 
 ## Teknoloji yığını
@@ -41,11 +41,14 @@ E-Ticaret/
     ├── index.html                  (vitrin: listeleme, arama, filtre, sıralama)
     ├── product.html                (ürün detayı)
     ├── cart.html                   (sepet + checkout)
+    ├── orders.html                 (kullanıcı sipariş geçmişi + durum takibi)
+    ├── admin.html                  (admin paneli: sipariş/ürün/kullanıcı yönetimi)
     ├── login.html / register.html  (giriş / kayıt)
     ├── css/                        (style.css, login.css)
     ├── js/
     │   ├── api.js                  (API taban adresi, fetch yardımcıları, JWT başlığı)
     │   ├── site.js                 (sayfalar arası ortak: nav, sepet rozeti, sepete ekleme)
+    │   ├── admin.js / orders.js    (admin paneli / sipariş geçmişi mantığı)
     │   └── home.js / product.js / cart.js / auth.js / register.js
     └── images/
 ```
@@ -55,10 +58,10 @@ E-Ticaret/
 - **Roles**: `Id`, `Name` (Admin / Customer)
 - **Users**: `Id`, `Username`, `PasswordHash`, `CreatedAt`, `CreatedBy`, `RoleId` (FK → Roles)
 - **Categories**: `Id`, `Name`
-- **Products**: `Id`, `Name`, `Description`, `Price`, `Stock`, `CategoryId` (FK), `ImageUrl`, `IsActive`
+- **Products**: `Id`, `Name`, `Description`, `Price`, `Stock`, `CategoryId` (FK), `ImageUrl`, `IsActive`, `DiscountPrice`, `DiscountStart`, `DiscountEnd` (süreli indirim; tarih aralığı dışında normal fiyat geçerli)
 - **CartItems**: `Id`, `UserId` (FK → Users), `ProductId` (FK → Products), `Quantity`
 - **Orders**: `Id`, `UserId` (FK → Users), `Status` (Pending / Approved / Rejected), `CreatedAt`, `ApprovedAt`, `ApprovedBy` (FK → Users)
-- **OrderItems**: `Id`, `OrderId` (FK), `ProductId` (FK), `Quantity`, `UnitPrice` (sipariş anındaki fiyatın anlık görüntüsü)
+- **OrderItems**: `Id`, `OrderId` (FK), `ProductId` (FK), `Quantity`, `UnitPrice` (sipariş anındaki fiyatın anlık görüntüsü), `Status` (kalem bazında durum: Pending / Approved / Rejected)
 - **Logs**: `Id`, `UserId` (nullable FK → Users), `Action`, `Details`, `Timestamp`
 
 **İş kuralı:** Bir sipariş onaylandığında (`Order.Status = Approved`), ilgili `OrderItems` satırlarındaki her ürün için `Product.Stock` düşürülür. Onay öncesi (`Pending`) veya reddedilen (`Rejected`) siparişlerde stok değişmez.
