@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using ETicaret.Api.Models.Dtos;
 using Microsoft.EntityFrameworkCore;
 using ETicaret.Api.Models.Entities;
+using Microsoft.AspNetCore.Identity;
 
 
 namespace ETicaret.Api.Controllers;
@@ -59,6 +60,126 @@ public class AdminController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+    // Kalem bazlı karar: gönderilen kalemler onaylanır, kalanlar reddedilir
+    [HttpPut("orders/{id}/decide")]
+    public async Task<IActionResult> DecideOrder(int id, OrderDecisionDto dto)
+    {
+        try
+        {
+            await _orderService.DecideOrderAsync(id, dto.ApprovedItemIds, CurrentUserId);
+            return Ok(new { message = "Sipariş kararı uygulandı." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("orders/{id}")]
+    public async Task<IActionResult> DeleteOrder(int id)
+    {
+        try
+        {
+            await _orderService.DeleteOrderAsync(id);
+            return Ok(new { message = "Sipariş silindi." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // Kargoda / Teslim Edildi gibi ileri durumlar için genel güncelleme
+    [HttpPut("orders/{id}/status")]
+    public async Task<IActionResult> UpdateOrderStatus(int id, OrderStatusDto dto)
+    {
+        try
+        {
+            await _orderService.UpdateStatusAsync(id, dto.Status, CurrentUserId);
+            return Ok(new { message = "Sipariş durumu güncellendi." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser(UserUpsertDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password))
+        {
+            return BadRequest(new { message = "Kullanıcı adı ve şifre zorunlu." });
+        }
+
+        if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
+        {
+            return BadRequest(new { message = "Bu kullanıcı adı zaten kullanılıyor." });
+        }
+
+        var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == (dto.Role ?? "Customer"));
+        if (role == null)
+        {
+            return BadRequest(new { message = "Geçersiz rol." });
+        }
+
+        var user = new User
+        {
+            Username = dto.Username,
+            RoleId = role.Id,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = User.Identity!.Name
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, dto.Password);
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Kullanıcı eklendi.", user.Id });
+    }
+
+    // Boş gelen alanlar değişmez; admin kendi rolünü düşüremez.
+    [HttpPut("users/{id}")]
+    public async Task<IActionResult> UpdateUser(int id, UserUpsertDto dto)
+    {
+        var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Role) && dto.Role != user.Role.Name)
+        {
+            if (user.Id == CurrentUserId)
+            {
+                return BadRequest(new { message = "Kendi rolünü değiştiremezsin." });
+            }
+
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == dto.Role);
+            if (role == null)
+            {
+                return BadRequest(new { message = "Geçersiz rol." });
+            }
+            user.RoleId = role.Id;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Username) && dto.Username != user.Username)
+        {
+            if (await _context.Users.AnyAsync(u => u.Username == dto.Username && u.Id != id))
+            {
+                return BadRequest(new { message = "Bu kullanıcı adı zaten kullanılıyor." });
+            }
+            user.Username = dto.Username;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, dto.Password);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Kullanıcı güncellendi." });
+    }
+
     [HttpGet("users")]
 public async Task<IActionResult> GetAllUsers()
 {

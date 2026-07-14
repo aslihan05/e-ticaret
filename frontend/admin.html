@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yönetim - E-Ticaret</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        if (localStorage.getItem("role") !== "Admin") {
+            window.location.replace("login.html");
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
+        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout">
+        <main class="admin-page">
+            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
+            <h2>YÖNETİM PANELİ</h2>
+            <p id="message"></p>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="orders">Siparişler</button>
+                <button class="tab-btn" data-tab="products">Ürünler</button>
+                <button class="tab-btn" data-tab="discounts">İndirimler</button>
+                <button class="tab-btn" data-tab="categories">Kategoriler</button>
+                <button class="tab-btn" data-tab="users">Kullanıcılar</button>
+                <button class="tab-btn" data-tab="logs">Loglar</button>
+                <button class="tab-btn" data-tab="analytics">Analiz</button>
+            </div>
+
+            <section id="tab-orders" class="tab-panel active">
+                <div id="admin-orders"></div>
+            </section>
+
+            <section id="tab-products" class="tab-panel">
+                <form id="product-form" class="admin-form">
+                    <input type="text" id="p-name" placeholder="Ürün adı" required>
+                    <input type="text" id="p-desc" placeholder="Açıklama">
+                    <input type="number" id="p-price" placeholder="Fiyat (TL)" min="0" step="0.01" required>
+                    <input type="number" id="p-stock" placeholder="Stok" min="0" required>
+                    <input type="text" id="p-image" placeholder="Görsel URL (opsiyonel)">
+                    <select id="p-category" required></select>
+                    <button type="submit" id="p-submit" class="add-btn">Ürün Ekle</button>
+                    <button type="button" id="p-cancel" class="btn-cancel" style="display:none">Vazgeç</button>
+                </form>
+                <div id="admin-products"></div>
+            </section>
+
+            <section id="tab-discounts" class="tab-panel">
+                <p class="tab-hint">İndirimli fiyat ve isteğe bağlı tarih aralığı gir; tarih boşsa indirim süresizdir. Kaldırmak için 🗑 kullan.</p>
+                <div id="admin-discounts"></div>
+            </section>
+
+            <section id="tab-categories" class="tab-panel">
+                <form id="category-form" class="admin-form">
+                    <input type="text" id="category-name" placeholder="Yeni kategori adı" required>
+                    <button type="submit" class="add-btn">Kategori Ekle</button>
+                </form>
+                <ul id="admin-categories" class="category-admin-list"></ul>
+            </section>
+
+            <section id="tab-users" class="tab-panel">
+                <form id="user-form" class="admin-form">
+                    <input type="text" id="u-name" placeholder="Kullanıcı adı" required>
+                    <input type="password" id="u-pass" placeholder="Şifre" required>
+                    <select id="u-role">
+                        <option value="Customer">Customer</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                    <button type="submit" class="add-btn">Kullanıcı Ekle</button>
+                </form>
+                <div id="admin-users"></div>
+            </section>
+
+            <section id="tab-logs" class="tab-panel">
+                <div id="admin-logs"></div>
+            </section>
+
+            <section id="tab-analytics" class="tab-panel">
+                <div id="admin-analytics"></div>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <p>E-Ticaret - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
