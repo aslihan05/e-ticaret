@@ -21,4 +21,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Chatbot'un sistem talimatına gömülen mağaza kuralları metni; çalışma dizinine kopyalanır. -->
+    <Content Include="Chatbot\magaza-kurallari.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

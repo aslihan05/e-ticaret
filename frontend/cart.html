@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sepetim - E-Ticaret</title>
+    <title>Sepetim - Ongima</title>
     <link rel="stylesheet" href="css/style.css">
     <script>
         if (!localStorage.getItem("token")) {
@@ -13,30 +13,81 @@
 </head>
 <body>
     <header>
-        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
-        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <h1><a href="shop.html">🛍️ Ongima</a></h1>
         <nav id="nav"></nav>
     </header>
 
     <div class="layout">
         <main class="cart-page">
-            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
+            <a class="back-home" href="shop.html">← Ana Sayfaya Dön</a>
             <h2>SEPETİM</h2>
             <p id="message"></p>
             <div id="cart-items"></div>
+
+            <!-- Teslimat adımı: "Siparişi Tamamla" tıklanana kadar gizli. Kayıtlı adresi olan
+                 müşteri özeti görüp onaylar; formu ancak "Değiştir" derse açar. -->
+            <div id="checkout-step" class="checkout-step" style="display:none">
+                <h3>Teslimat Bilgileri</h3>
+
+                <div id="address-summary" class="address-summary" style="display:none">
+                    <div id="address-summary-text"></div>
+                    <button type="button" id="address-edit" class="link-btn">Değiştir</button>
+                </div>
+
+                <div id="checkout-form" class="checkout-form">
+                    <div class="checkout-grid">
+                        <input type="text" id="recipient-name" placeholder="Ad Soyad">
+                        <input type="tel" id="phone" placeholder="Telefon (05xx...)">
+                        <input type="text" id="city" placeholder="İl (şehir)">
+                        <input type="text" id="district" placeholder="İlçe">
+                        <textarea id="address" rows="3" placeholder="Açık adres (mahalle, sokak, kapı no...)"></textarea>
+                    </div>
+                    <p class="field-note" id="address-save-note">Bu adres hesabına kaydedilir; sonraki siparişlerde tekrar yazman gerekmez.</p>
+                </div>
+
+                <div class="checkout-actions">
+                    <button id="confirm-btn" class="add-btn">Siparişi Onayla</button>
+                    <button type="button" id="checkout-cancel" class="filter-clear">Vazgeç</button>
+                </div>
+            </div>
+
+            <div id="coupon-box" class="coupon-box">
+                <label for="coupon-code">🎟️ İndirim kuponun var mı?</label>
+                <div class="coupon-row">
+                    <input type="text" id="coupon-code" placeholder="Kupon kodu" autocomplete="off">
+                    <button type="button" id="coupon-apply" class="add-btn">Uygula</button>
+                </div>
+                <p id="coupon-message" class="coupon-message"></p>
+            </div>
+
             <div class="cart-summary">
-                <strong>Toplam: <span id="cart-total">0 TL</span></strong>
+                <div class="summary-lines">
+                    <div class="summary-line">
+                        <span>Ara toplam</span>
+                        <span id="cart-subtotal">0 TL</span>
+                    </div>
+                    <!-- İndirim satırı yalnızca kupon uygulanınca JS tarafından gösterilir -->
+                    <div class="summary-line summary-discount" id="discount-line" style="display:none">
+                        <span id="discount-label">İndirim</span>
+                        <span id="cart-discount">0 TL</span>
+                    </div>
+                    <div class="summary-line summary-total">
+                        <span>Toplam</span>
+                        <strong id="cart-total">0 TL</strong>
+                    </div>
+                </div>
                 <button id="checkout-btn" class="add-btn">Siparişi Tamamla</button>
             </div>
         </main>
     </div>
 
     <footer>
-        <p>E-Ticaret - Aslı'nın Projesi</p>
+        <p>Ongima - Aslı'nın Projesi</p>
     </footer>
 
     <script src="js/api.js"></script>
     <script src="js/site.js"></script>
+    <script src="js/chatbot.js"></script>
     <script src="js/cart.js"></script>
 </body>
 </html>

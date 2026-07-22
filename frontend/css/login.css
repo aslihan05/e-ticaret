@@ -51,7 +51,9 @@
     justify-content: center;
     align-items: center;
     padding: 40px;
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 55%, #4c1d95 100%);
+    background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 35%, #7c3aed 65%, #db2777 100%);
+    background-size: 220% 220%;
+    animation: auroraShift 14s ease infinite;
     overflow: hidden;
 }
 
@@ -114,7 +116,8 @@
     color: rgba(255, 255, 255, 0.85);
 }
 
-.login-card input {
+.login-card input,
+.login-card textarea {
     display: block;
     width: 100%;
     padding: 12px 14px;
@@ -127,7 +130,26 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.login-card input:focus {
+.login-card textarea {
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* Zorunlu olmayan alanların etiketindeki soluk "(opsiyonel)" notu */
+.login-card .optional {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.8rem;
+}
+
+/* Alan altındaki kural açıklaması (örn. "En az 6 karakter") */
+.login-card .field-hint {
+    margin: -12px 0 16px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.login-card input:focus,
+.login-card textarea:focus {
     outline: none;
     border-color: rgb(255, 210, 100);
     box-shadow: 0 0 0 4px rgba(255, 210, 100, 0.2);
@@ -211,6 +233,19 @@
     to {
         transform: translate(-30px, 30px) scale(1.15);
     }
+}
+
+/* Sağ panelin arka planında yavaşça gezinen renk geçişi */
+@keyframes auroraShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-panel { animation: none; }
+    .login-panel::before,
+    .login-panel::after { animation: none; }
 }
 
 /* ===== Mobil ===== */

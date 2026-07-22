@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ongima</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="has-catmenu">
+        <h1><a href="shop.html">🛍️ Ongima</a></h1>
+
+        <!-- Kategoriler & Filtreler artık kenar çubuğunda değil, Ongima'nın yanındaki bu
+             tetikleyiciden çapraz açılan "havalı" bir kutuda. Kutunun içeriği (kategori listesi +
+             filtreler) aynı id'lerle taşındığı için home.js olduğu gibi çalışır. -->
+        <div class="catmenu" id="catmenu">
+            <button type="button" id="catmenu-trigger" class="catmenu-trigger"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="catmenu-box">
+                <span class="catmenu-icon" aria-hidden="true">☰</span>
+                <span>Kategoriler &amp; Filtreler</span>
+            </button>
+
+            <div class="catmenu-box" id="catmenu-box">
+                <section class="sidebar-panel">
+                    <button type="button" class="panel-head" aria-expanded="true" aria-controls="panel-categories">
+                        <span>Kategoriler</span>
+                        <span class="panel-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="panel-body" id="panel-categories">
+                        <ul id="category-list"></ul>
+                    </div>
+                </section>
+
+                <section class="sidebar-panel">
+                    <button type="button" class="panel-head" aria-expanded="true" aria-controls="panel-filters">
+                        <span>Filtreler</span>
+                        <span class="panel-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="panel-body" id="panel-filters">
+                        <h3 class="filter-subtitle">Fiyat Aralığı</h3>
+                        <div class="price-filter">
+                            <input type="number" id="price-min" placeholder="Min" min="0">
+                            <input type="number" id="price-max" placeholder="Max" min="0">
+                        </div>
+
+                        <h3 class="filter-subtitle">Puan</h3>
+                        <select id="rating-filter" class="filter-select">
+                            <option value="">Tüm puanlar</option>
+                            <option value="4">★★★★ 4 yıldız ve üzeri</option>
+                            <option value="3">★★★ 3 yıldız ve üzeri</option>
+                            <option value="2">★★ 2 yıldız ve üzeri</option>
+                        </select>
+
+                        <h3 class="filter-subtitle">Durum</h3>
+                        <label class="filter-check">
+                            <input type="checkbox" id="filter-discount"> Sadece indirimli ürünler
+                        </label>
+                        <label class="filter-check">
+                            <input type="checkbox" id="filter-instock"> Sadece stokta olanlar
+                        </label>
+
+                        <button id="price-apply" class="add-btn filter-apply">Uygula</button>
+                        <button id="price-clear" class="filter-clear">Filtreleri Temizle</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <input type="text" id="search" placeholder="Ürün ara...">
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout layout-shop">
+        <!-- Ongima'nın altında, canlı renkli yuvarlak hızlı butonlar (Trendyol tarzı):
+             tek tıkla en çok satanlar / en çok favori / sana özel öneriler listesine geçilir. -->
+        <div class="quick-cats" id="quick-cats">
+            <button type="button" class="quick-cat" data-mode="best-selling">
+                <span class="quick-cat-badge qc-best" aria-hidden="true">🔥</span>
+                <span class="quick-cat-label">En Çok Satanlar</span>
+            </button>
+            <button type="button" class="quick-cat" data-mode="most-favorited">
+                <span class="quick-cat-badge qc-fav" aria-hidden="true">❤️</span>
+                <span class="quick-cat-label">En Çok Favori Seçilenler</span>
+            </button>
+            <button type="button" class="quick-cat" data-mode="recommended">
+                <span class="quick-cat-badge qc-reco" aria-hidden="true">✨</span>
+                <span class="quick-cat-label">Senin İçin Önerilenler</span>
+            </button>
+            <button type="button" class="quick-cat" data-mode="new-arrivals">
+                <span class="quick-cat-badge qc-new" aria-hidden="true">🆕</span>
+                <span class="quick-cat-label">Yeni Gelenler</span>
+            </button>
+        </div>
+
+        <section class="banner">
+            <div class="banner-text">
+                <h2>Sezon indirimi başladı! 🔥</h2>
+                <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
+                <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
+            </div>
+            <div id="sale-strip" class="sale-strip"></div>
+        </section>
+
+        <main>
+            <div class="toolbar">
+                <h2 id="list-title">Tüm Ürünler</h2>
+                <select id="sort">
+                    <option value="default">Önerilen</option>
+                    <option value="price-asc">Fiyat: Düşükten Yükseğe</option>
+                    <option value="price-desc">Fiyat: Yüksekten Düşüğe</option>
+                    <option value="rating-desc">En Çok Beğenilen</option>
+                </select>
+            </div>
+            <div id="product-grid"></div>
+            <div id="pagination" class="pagination"></div>
+        </main>
+    </div>
+
+    <footer>
+        <p>Ongima - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/chatbot.js"></script>
+    <script src="js/home.js"></script>
+</body>
+</html>

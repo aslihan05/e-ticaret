@@ -3,39 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetim - E-Ticaret</title>
+    <title>Yönetim - Ongima</title>
     <link rel="stylesheet" href="css/style.css">
     <script>
-        if (localStorage.getItem("role") !== "Admin") {
-            window.location.replace("login.html");
-        }
+        // İçerik oluşmadan hızlı koruma: rol, kurcalanabilen localStorage yerine
+        // imzalı JWT'nin rol claim'inden doğrulanır (asıl kontrol admin.js'te tekrarlanır).
+        (function () {
+            try {
+                const t = localStorage.getItem("token");
+                const p = t && JSON.parse(decodeURIComponent(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+                    .split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")));
+                const role = p && (p["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ?? p.role);
+                const valid = p && (!p.exp || p.exp * 1000 > Date.now());
+                if (!valid || role !== "Admin") window.location.replace("login.html");
+            } catch { window.location.replace("login.html"); }
+        })();
     </script>
 </head>
 <body>
     <header>
-        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
-        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <h1><a href="shop.html">🛍️ Ongima</a></h1>
         <nav id="nav"></nav>
     </header>
 
     <div class="layout">
         <main class="admin-page">
-            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
-            <h2>YÖNETİM PANELİ</h2>
-            <p id="message"></p>
+            <a class="back-home" href="shop.html">← Ana Sayfaya Dön</a>
+            <div class="admin-layout">
+                <nav class="admin-nav">
+                    <button class="tab-btn active" data-tab="orders">📦 Siparişler <span id="pending-badge" class="tab-badge" style="display:none"></span></button>
+                    <button class="tab-btn" data-tab="products">🛍️ Ürünler</button>
+                    <button class="tab-btn" data-tab="discounts">🏷️ İndirimler</button>
+                    <button class="tab-btn" data-tab="coupons">🎟️ Kuponlar</button>
+                    <button class="tab-btn" data-tab="categories">📂 Kategoriler</button>
+                    <button class="tab-btn" data-tab="users">👥 Kullanıcılar</button>
+                    <button class="tab-btn" data-tab="logs">📜 Loglar</button>
+                    <button class="tab-btn" data-tab="analytics">📊 Analiz</button>
+                </nav>
 
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="orders">Siparişler</button>
-                <button class="tab-btn" data-tab="products">Ürünler</button>
-                <button class="tab-btn" data-tab="discounts">İndirimler</button>
-                <button class="tab-btn" data-tab="categories">Kategoriler</button>
-                <button class="tab-btn" data-tab="users">Kullanıcılar</button>
-                <button class="tab-btn" data-tab="logs">Loglar</button>
-                <button class="tab-btn" data-tab="analytics">Analiz</button>
-            </div>
+                <div class="admin-content">
+                    <h2>YÖNETİM PANELİ</h2>
+                    <p id="message"></p>
 
-            <section id="tab-orders" class="tab-panel active">
+                    <section id="tab-orders" class="tab-panel active">
+                <div class="order-search-bar">
+                    <input type="text" id="order-search" class="order-search"
+                           placeholder="🔍 Sipariş/müşteri no, müşteri/alıcı adı, e-posta, il, ilçe, ürün veya tarih (örn. 20.07.2026) ara...">
+                </div>
+                <nav class="subtab-nav order-view-toggle">
+                    <button type="button" class="ov-btn active" data-view="table">📋 Tablo</button>
+                    <button type="button" class="ov-btn" data-view="region">📍 İl / İlçe</button>
+                </nav>
                 <div id="admin-orders"></div>
+                <div id="admin-orders-grouped" style="display:none"></div>
             </section>
 
             <section id="tab-products" class="tab-panel">
@@ -43,23 +63,106 @@
                     <input type="text" id="p-name" placeholder="Ürün adı" required>
                     <input type="text" id="p-desc" placeholder="Açıklama">
                     <input type="number" id="p-price" placeholder="Fiyat (TL)" min="0" step="0.01" required>
+                    <input type="number" id="p-cost" placeholder="Maliyet (TL)" min="0" step="0.01">
                     <input type="number" id="p-stock" placeholder="Stok" min="0" required>
-                    <input type="text" id="p-image" placeholder="Görsel URL (opsiyonel)">
+                    <input type="text" id="p-image" placeholder="Ana görsel URL (opsiyonel)">
+                    <textarea id="p-images" placeholder="Ek görseller — slider için, her satıra bir URL" rows="3"></textarea>
                     <select id="p-category" required></select>
                     <button type="submit" id="p-submit" class="add-btn">Ürün Ekle</button>
                     <button type="button" id="p-cancel" class="btn-cancel" style="display:none">Vazgeç</button>
                 </form>
+
+                <!-- Generic çoklu-kolon filtre (Task #3): her kutu bir sütuna, kendi veri tipine
+                     uygun araçla karşılık gelir. Değişince tablo AJAX ile anında güncellenir. -->
+                <div class="admin-form column-filter" id="product-filter-bar">
+                    <input type="text" id="pf-name" placeholder="🔍 Ürün adı">
+                    <input type="number" id="pf-min-price" placeholder="Min fiyat" min="0" step="0.01">
+                    <input type="number" id="pf-max-price" placeholder="Max fiyat" min="0" step="0.01">
+                    <input type="number" id="pf-min-stock" placeholder="Min stok" min="0">
+                    <select id="pf-category"><option value="">Tüm kategoriler</option></select>
+                    <select id="pf-active">
+                        <option value="">Aktif + Pasif</option>
+                        <option value="true">Sadece aktif</option>
+                        <option value="false">Sadece pasif</option>
+                    </select>
+                    <button type="button" id="pf-clear" class="btn-cancel">Filtreyi Temizle</button>
+                </div>
+
                 <div id="admin-products"></div>
             </section>
 
             <section id="tab-discounts" class="tab-panel">
-                <p class="tab-hint">İndirimli fiyat ve isteğe bağlı tarih aralığı gir; tarih boşsa indirim süresizdir. Kaldırmak için 🗑 kullan.</p>
+                <!-- 1. bölüm: toplu araçlar (kategori / seçilenler) -->
+                <h3 class="analytics-h">Toplu İndirim Araçları</h3>
+                <p class="tab-hint">Bir kategorinin tüm ürünlerine ya da tabloda seçtiğin ürünlere tek seferde indirim uygula.</p>
+
+                <nav class="subtab-nav">
+                    <button type="button" class="subtab-btn active" data-subtab="category">📂 Kategoriye Göre İndirim</button>
+                    <button type="button" class="subtab-btn" data-subtab="bulk">☑️ Seçilenlere Toplu İndirim</button>
+                </nav>
+
+                <div id="disc-subtab-category" class="subtab-panel active">
+                    <div class="admin-form" id="cat-discount-bar">
+                        <select id="cd-category"></select>
+                        <input type="number" id="cd-percent" placeholder="İndirim %" min="1" max="99">
+                        <input type="datetime-local" id="cd-start" title="Başlangıç (opsiyonel)">
+                        <input type="datetime-local" id="cd-end" title="Bitiş (opsiyonel)">
+                        <button type="button" id="cd-apply" class="add-btn">Kategoriye Uygula</button>
+                    </div>
+                </div>
+
+                <div id="disc-subtab-bulk" class="subtab-panel">
+                    <div class="admin-form" id="bulk-discount-bar">
+                        <label class="bulk-count"><input type="checkbox" id="disc-select-all"> Görünenleri seç</label>
+                        <input type="number" id="bulk-percent" placeholder="İndirim %" min="1" max="99">
+                        <input type="datetime-local" id="bulk-start" title="Başlangıç (opsiyonel)">
+                        <input type="datetime-local" id="bulk-end" title="Bitiş (opsiyonel)">
+                        <button type="button" id="bulk-apply" class="add-btn">Seçilenlere Uygula</button>
+                        <button type="button" id="bulk-clear" class="btn-cancel">Seçilenlerin İndirimini Kaldır</button>
+                    </div>
+                </div>
+
+                <!-- 2. bölüm: ürün bazında tablo (başlık + arama aynı satırda) -->
+                <div class="disc-table-head">
+                    <h3 class="analytics-h">Ürün Bazında İndirim</h3>
+                    <input type="text" id="disc-search" class="disc-search" placeholder="🔍 Ürün ara...">
+                </div>
+                <p class="tab-hint">Bir ürünün satırına % ya da indirimli fiyat gir → <strong>Kaydet</strong>. Kaldırmak için 🗑. Toplu işlem için satırları seçip yukarıdaki araçları kullan.</p>
                 <div id="admin-discounts"></div>
+            </section>
+
+            <section id="tab-coupons" class="tab-panel">
+                <form id="coupon-form" class="admin-form coupon-form">
+                    <input type="text" id="c-code" placeholder="Kod (örn. YAZ10)" required>
+                    <select id="c-type">
+                        <option value="0">% Yüzde</option>
+                        <option value="1">TL Tutar</option>
+                    </select>
+                    <input type="number" id="c-value" placeholder="Değer" step="0.01" min="0" required>
+                    <!-- Çoklu seçim: hiç kimse seçilmezse kupon herkese açıktır -->
+                    <div id="c-users" class="user-picker" title="Kupon kimlere tanımlansın?">
+                        <button type="button" id="c-users-toggle" class="user-picker-toggle"
+                                aria-expanded="false" aria-controls="c-users-list">Herkese açık</button>
+                        <div id="c-users-list" class="user-picker-list" hidden></div>
+                    </div>
+                    <input type="number" id="c-min" placeholder="Min. sepet (TL)" step="0.01" min="0">
+                    <input type="number" id="c-maxuses" placeholder="Toplam limit" min="1">
+                    <input type="number" id="c-peruser" placeholder="Kişi başı limit" min="1">
+                    <input type="datetime-local" id="c-start" title="Başlangıç (boş = hemen)">
+                    <input type="datetime-local" id="c-end" title="Bitiş (boş = süresiz)">
+                    <button type="submit" class="add-btn">Kupon Ekle</button>
+                    <button type="button" id="coupon-cancel" class="filter-clear" style="display:none">Vazgeç</button>
+                </form>
+                <p class="tab-hint">Boş bırakılan limit/tarih alanları "sınırsız" demektir. Kupon silinmez, <strong>kapatılır</strong> — geçmiş siparişlerin kaydı korunur. Müşteri seçilirse kuponu <strong>yalnızca seçilen müşteriler</strong> görür ve kullanabilir; hiç seçilmezse herkese açıktır.</p>
+                <div id="admin-coupons"></div>
             </section>
 
             <section id="tab-categories" class="tab-panel">
                 <form id="category-form" class="admin-form">
                     <input type="text" id="category-name" placeholder="Yeni kategori adı" required>
+                    <select id="category-parent">
+                        <option value="">Ana kategori (üst yok)</option>
+                    </select>
                     <button type="submit" class="add-btn">Kategori Ekle</button>
                 </form>
                 <ul id="admin-categories" class="category-admin-list"></ul>
@@ -68,7 +171,10 @@
             <section id="tab-users" class="tab-panel">
                 <form id="user-form" class="admin-form">
                     <input type="text" id="u-name" placeholder="Kullanıcı adı" required>
-                    <input type="password" id="u-pass" placeholder="Şifre" required>
+                    <input type="email" id="u-email" placeholder="E-posta (zorunlu)" required>
+                    <input type="tel" id="u-phone" placeholder="Telefon">
+                    <input type="text" id="u-address" placeholder="Adres">
+                    <input type="password" id="u-pass" placeholder="Şifre (en az 6 karakter)" minlength="6" required>
                     <select id="u-role">
                         <option value="Customer">Customer</option>
                         <option value="Admin">Admin</option>
@@ -79,17 +185,116 @@
             </section>
 
             <section id="tab-logs" class="tab-panel">
+                <div class="admin-form" id="logs-filter-bar">
+                    <input type="text" id="log-search" placeholder="🔍 İşlem, kullanıcı, IP, yol veya hata ara...">
+                    <span class="tab-hint">Her kaydın ne olduğu "Açıklama" sütununda düz Türkçe yazar (kim, neyi, hangi sonuçla).</span>
+                </div>
                 <div id="admin-logs"></div>
             </section>
 
-            <section id="tab-analytics" class="tab-panel">
-                <div id="admin-analytics"></div>
-            </section>
+                    <section id="tab-analytics" class="tab-panel">
+                        <!-- Glassmorphism gösterge paneli: ferah/aydınlık tema + buzlu cam kartlar.
+                             "Böl ve Yönet": her alt-sekmenin JS'i yalnızca o sekme aktifken çalışır
+                             (Canlı Akış interval'i durur, harita ilk açılışta bir kez kurulur). -->
+                        <div class="dash">
+                            <nav class="dash-subnav" role="tablist">
+                                <button type="button" class="dash-tab active" data-dash="summary">📊 Özet</button>
+                                <button type="button" class="dash-tab" data-dash="live">🔴 Canlı Akış</button>
+                                <button type="button" class="dash-tab" data-dash="map">🗺️ Bölgesel Harita</button>
+                            </nav>
+
+                            <div id="dash-summary" class="dash-panel active">
+                                <div class="admin-form dash-glass" id="analytics-range-bar">
+                                    <label class="bulk-count">Başlangıç <input type="date" id="an-from"></label>
+                                    <label class="bulk-count">Bitiş <input type="date" id="an-to"></label>
+                                    <select id="an-category" title="Kategoriye göre"><option value="">Tüm kategoriler</option></select>
+                                    <select id="an-status" title="Sipariş durumuna göre">
+                                        <option value="">Tüm durumlar</option>
+                                        <option value="0">Bekliyor</option>
+                                        <option value="1">Onaylandı</option>
+                                        <option value="2">Reddedildi</option>
+                                        <option value="3">Kargoda</option>
+                                        <option value="4">Teslim Edildi</option>
+                                        <option value="5">İptal Edildi</option>
+                                    </select>
+                                    <input type="text" id="an-customer" placeholder="🔍 Müşteri adı / no" title="Müşteri adına veya numarasına göre">
+                                    <input type="text" id="an-city" placeholder="Şehir" title="Sipariş şehrine göre">
+                                    <input type="number" id="an-min-total" placeholder="Min ₺" min="0" title="Sipariş tutarı alt sınırı">
+                                    <input type="number" id="an-max-total" placeholder="Max ₺" min="0" title="Sipariş tutarı üst sınırı">
+                                    <button type="button" id="an-apply" class="add-btn">Filtreyi Uygula</button>
+                                    <button type="button" id="an-clear" class="btn-cancel">Temizle</button>
+                                </div>
+                                <div id="admin-analytics"></div>
+                            </div>
+
+                            <div id="dash-live" class="dash-panel">
+                                <div class="dash-glass live-head">
+                                    <div class="live-title">
+                                        <span class="live-dot"></span>
+                                        <h3>Canlı Sipariş Akışı</h3>
+                                        <span class="live-sub">gerçek siparişler · canlı</span>
+                                    </div>
+                                    <div class="live-stats">
+                                        <div class="live-stat"><span id="live-count">0</span><small>oturum siparişi</small></div>
+                                        <div class="live-stat"><span id="live-sum">0 TL</span><small>oturum cirosu</small></div>
+                                        <button type="button" id="live-toggle" class="add-btn live-toggle">⏸ Duraklat</button>
+                                    </div>
+                                </div>
+                                <div id="live-feed" class="live-feed dash-glass">
+                                    <p class="live-empty">Canlı akış başladı, yeni siparişler bekleniyor…</p>
+                                </div>
+                            </div>
+
+                            <div id="dash-map" class="dash-panel">
+                                <div class="dash-glass map-head">
+                                    <h3>🗺️ Bölgelere Göre Sipariş Yoğunluğu</h3>
+                                    <span class="live-sub">Bölgenin üzerine gel — detay için</span>
+                                </div>
+                                <div class="map-wrap dash-glass">
+                                    <div id="region-map" class="region-map"></div>
+                                    <div id="map-tooltip" class="map-tooltip" hidden></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </main>
     </div>
 
+    <!-- Müşteri bilgileri penceresi -->
+    <div id="customer-modal" class="info-modal-overlay" style="display:none">
+        <div class="info-modal-box">
+            <button class="info-modal-close" id="customer-modal-close">×</button>
+            <div id="customer-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Ürünün sipariş tarihçesi penceresi -->
+    <div id="product-history-modal" class="info-modal-overlay" style="display:none">
+        <div class="info-modal-box">
+            <button class="info-modal-close" id="product-history-close">×</button>
+            <h3 id="product-history-title"></h3>
+            <!-- Ürün geçmişi sütun filtreleri (Task #3): AJAX ile filtrelenmiş geçmiş yüklenir -->
+            <div class="admin-form column-filter" id="history-filter-bar" style="display:none">
+                <input type="text" id="hf-customer" placeholder="🔍 Müşteri adı">
+                <label class="filter-date">Baş. <input type="date" id="hf-from"></label>
+                <label class="filter-date">Bit. <input type="date" id="hf-to"></label>
+                <input type="number" id="hf-min-qty" placeholder="Min adet" min="1">
+                <select id="hf-status">
+                    <option value="">Tüm durumlar</option>
+                    <option value="1">Onaylandı</option>
+                    <option value="0">Bekliyor</option>
+                    <option value="2">Reddedildi</option>
+                </select>
+                <button type="button" id="hf-clear" class="btn-cancel">Temizle</button>
+            </div>
+            <div id="product-history-body"></div>
+        </div>
+    </div>
+
     <footer>
-        <p>E-Ticaret - Aslı'nın Projesi</p>
+        <p>Ongima - Aslı'nın Projesi</p>
     </footer>
 
     <script src="js/api.js"></script>

@@ -3,59 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Ticaret</title>
+    <title>Ongima</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* ===== Tanıtım (landing) sayfası ===== */
+        body { background: #faf8f3; }
+
+        /* ---- Hero ---- */
+        .hero {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            align-items: center;
+            gap: 40px;
+            max-width: 1160px;
+            margin: 0 auto;
+            padding: 72px 24px 64px;
+        }
+        /* Dekoratif ışık lekeleri */
+        .hero::before,
+        .hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            z-index: 0;
+        }
+        .hero::before {
+            top: -130px; right: -60px;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(255, 200, 80, 0.40), transparent 70%);
+        }
+        .hero::after {
+            bottom: -160px; left: -120px;
+            width: 380px; height: 380px;
+            background: radial-gradient(circle, rgba(109, 40, 217, 0.16), transparent 70%);
+        }
+
+        .hero-content { position: relative; z-index: 1; }
+        .eyebrow {
+            display: inline-block;
+            background: rgba(30, 27, 75, 0.06);
+            color: #1e1b4b;
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 7px 15px;
+            border-radius: 999px;
+            margin-bottom: 20px;
+        }
+        .hero-content h2 {
+            font-size: 3.1rem;
+            line-height: 1.08;
+            color: #1e1b4b;
+            letter-spacing: -0.5px;
+        }
+        .hero-content h2 .accent {
+            background: linear-gradient(90deg, #6d28d9, #e11d48, #f59e0b, #6d28d9);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: accentShimmer 6s ease infinite;
+        }
+        @keyframes accentShimmer {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .hero-content .lead {
+            margin: 20px 0 30px;
+            font-size: 1.13rem;
+            color: #4b5563;
+            max-width: 480px;
+            line-height: 1.65;
+        }
+
+        .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+        .btn-primary {
+            padding: 15px 32px;
+            background: linear-gradient(90deg, #1e1b4b, #4c1d95);
+            color: #fff;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            box-shadow: 0 12px 28px rgba(76, 29, 149, 0.28);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(76, 29, 149, 0.36); }
+        .btn-ghost {
+            padding: 15px 32px;
+            background: #fff;
+            color: #1e1b4b;
+            border: 1.5px solid #e2ddf0;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.05rem;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .btn-ghost:hover { border-color: #1e1b4b; transform: translateY(-2px); }
+
+        .trust-row { display: flex; gap: 30px; margin-top: 34px; }
+        .trust-row strong { display: block; font-size: 1.5rem; color: #1e1b4b; }
+        .trust-row span { font-size: 0.82rem; color: #6b7280; }
+
+        /* ---- Hero görseli: yüzen ürün kartları ---- */
+        .hero-visual { position: relative; z-index: 1; height: 400px; }
+        .glow-circle {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, #6d28d9, #e11d48, #f59e0b, #22d3ee, #6d28d9);
+            opacity: 0.16;
+            filter: blur(6px);
+            animation: glowSpin 18s linear infinite;
+        }
+        @keyframes glowSpin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        .float-card {
+            position: absolute;
+            background: #fff;
+            border-radius: 18px;
+            padding: 16px;
+            width: 165px;
+            box-shadow: 0 22px 48px rgba(30, 27, 75, 0.16);
+            animation: floaty 5s ease-in-out infinite;
+        }
+        .float-card .fc-emoji {
+            font-size: 2.6rem;
+            display: block;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .float-card h4 { color: #1e1b4b; font-size: 0.95rem; }
+        .float-card .fc-price { color: #e11d48; font-weight: 700; font-size: 1rem; }
+        .float-card .fc-old { color: #9ca3af; text-decoration: line-through; font-size: 0.82rem; margin-left: 6px; }
+
+        .fc-1 { top: 20px; left: 30px; transform: rotate(-5deg); animation-delay: 0s; }
+        .fc-2 { top: 130px; right: 20px; transform: rotate(4deg); animation-delay: 0.8s; }
+        .fc-3 { bottom: 10px; left: 70px; transform: rotate(3deg); animation-delay: 1.6s; }
+
+        @keyframes floaty {
+            0%, 100% { translate: 0 0; }
+            50% { translate: 0 -12px; }
+        }
+
+        /* ---- Güven / özellik / CTA bölümleri ---- */
+        .features {
+            max-width: 1160px;
+            margin: 0 auto;
+            padding: 20px 24px 60px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 22px;
+        }
+        .feature-card {
+            background: #fff;
+            border: 1px solid #efece3;
+            border-radius: 16px;
+            padding: 30px 24px;
+            text-align: center;
+            box-shadow: 0 10px 26px rgba(30, 27, 75, 0.06);
+            transition: transform 0.18s, box-shadow 0.18s;
+        }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 18px 38px rgba(30, 27, 75, 0.12); }
+        .feature-card .icon { font-size: 2.6rem; }
+        .feature-card h3 { color: #1e1b4b; margin: 12px 0 8px; font-size: 1.12rem; }
+        .feature-card p { color: #6b7280; font-size: 0.92rem; line-height: 1.55; }
+
+        .cta-band {
+            max-width: 1160px;
+            margin: 0 auto 70px;
+            padding: 48px 40px;
+            border-radius: 22px;
+            background: linear-gradient(120deg, #1e1b4b 0%, #4c1d95 35%, #7c3aed 65%, #db2777 100%);
+            background-size: 220% 220%;
+            animation: ctaFlow 12s ease infinite;
+            color: #fff;
+            text-align: center;
+            box-shadow: 0 24px 50px rgba(76, 29, 149, 0.30);
+        }
+        @keyframes ctaFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .cta-band h2 { font-size: 2rem; margin-bottom: 10px; }
+        .cta-band p { color: #d8d2f0; margin-bottom: 24px; }
+        .cta-band .btn-gold {
+            display: inline-block;
+            padding: 15px 36px;
+            background: rgb(255, 214, 110);
+            color: #1e1b4b;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            transition: transform 0.15s;
+        }
+        .cta-band .btn-gold:hover { transform: translateY(-2px); }
+
+        /* ---- Bölüm başlığı ---- */
+        .section { max-width: 1160px; margin: 0 auto; padding: 26px 24px; }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+        .section-head h2 { color: #1e1b4b; font-size: 1.7rem; }
+        .section-head p { color: #6b7280; font-size: 0.95rem; margin-top: 4px; }
+        .see-all { color: #6d28d9; font-weight: 600; text-decoration: none; white-space: nowrap; }
+        .see-all:hover { text-decoration: underline; }
+
+        /* ---- Kategori çipleri ---- */
+        .cat-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+        .cat-chip {
+            background: #fff;
+            border: 1px solid #efece3;
+            border-radius: 999px;
+            padding: 12px 22px;
+            color: #1e1b4b;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: 0 6px 16px rgba(30, 27, 75, 0.05);
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .cat-chip:hover {
+            transform: translateY(-3px);
+            border-color: #6d28d9;
+            box-shadow: 0 12px 24px rgba(109, 40, 217, 0.14);
+        }
+
+        /* ---- Ürün önizleme kartları ---- */
+        .landing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 18px;
+        }
+        .pcard {
+            position: relative;
+            background: #fff;
+            border: 1px solid #efece3;
+            border-radius: 14px;
+            padding: 14px;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+        }
+        .pcard:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 30px rgba(30, 27, 75, 0.14);
+            border-color: rgb(255, 232, 162);
+        }
+        .pcard-media, .pcard-ph {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .pcard-ph {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgb(255, 244, 214);
+            color: #1e1b4b;
+            font-size: 2.4rem;
+            font-weight: 600;
+        }
+        .pcard h3 { color: #1e1b4b; font-size: 1rem; }
+        .pcard .p-price { color: #1e1b4b; font-weight: 700; }
+        .pcard .p-old { color: #9ca3af; text-decoration: line-through; font-size: 0.85rem; margin-right: 6px; }
+        .pcard .p-new { color: #e11d48; font-weight: 700; }
+        .p-badge {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: linear-gradient(120deg, #e11d48, #f43f5e);
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .view-hint { margin-top: auto; font-size: 0.82rem; color: #6d28d9; font-weight: 600; }
+
+        @media (max-width: 860px) {
+            .hero { grid-template-columns: 1fr; padding: 50px 20px 40px; }
+            .hero-content h2 { font-size: 2.3rem; }
+            .hero-visual { display: none; }
+        }
+
+        /* Hareket hassasiyeti olan kullanıcı için tüm dekoratif animasyonlar kapatılır */
+        @media (prefers-reduced-motion: reduce) {
+            .accent, .glow-circle, .cta-band, .float-card { animation: none; }
+        }
+    </style>
 </head>
 <body>
     <header>
-        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
-        <input type="text" id="search" placeholder="Ürün ara...">
-        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
-        <nav id="nav"></nav>
+        <h1><a href="index.html">🛍️ Ongima</a></h1>
     </header>
 
-    <div class="layout">
-        <section class="banner">
-            <div class="banner-text">
-                <h2>Sezon indirimi başladı! 🔥</h2>
-                <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
-                <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
+    <!-- ===== Hero ===== -->
+    <section class="hero">
+        <div class="hero-content">
+            <span class="eyebrow">✨ Yeni sezon ürünleri geldi</span>
+            <h2>Aradığın her şey <span class="accent">Ongima</span>'da</h2>
+            <p class="lead">
+                Binlerce ürün, güvenli alışveriş ve hızlı teslimat tek bir adreste.
+                Alışverişe başlamak için giriş yap, keşfetmenin keyfini çıkar.
+            </p>
+            <div class="hero-actions">
+                <a href="login.html" class="btn-primary">Alışverişe Başla</a>
+                <a href="register.html" class="btn-ghost">Hesap Oluştur</a>
             </div>
-            <div id="sale-strip" class="sale-strip"></div>
-        </section>
-
-        <aside>
-            <h2>Kategoriler</h2>
-            <ul id="category-list"></ul>
-
-            <h2 class="filter-title">Fiyat Aralığı</h2>
-            <div class="price-filter">
-                <input type="number" id="price-min" placeholder="Min" min="0">
-                <input type="number" id="price-max" placeholder="Max" min="0">
+            <div class="trust-row">
+                <div><strong>10.000+</strong><span>Ürün çeşidi</span></div>
+                <div><strong>50K+</strong><span>Mutlu müşteri</span></div>
+                <div><strong>7/24</strong><span>Destek</span></div>
             </div>
-            <button id="price-apply" class="add-btn filter-apply">Uygula</button>
-            <button id="price-clear" class="filter-clear">Temizle</button>
-        </aside>
+        </div>
 
-        <main>
-            <div class="toolbar">
-                <h2 id="list-title">Tüm Ürünler</h2>
-                <select id="sort">
-                    <option value="default">Önerilen</option>
-                    <option value="price-asc">Fiyat: Düşükten Yükseğe</option>
-                    <option value="price-desc">Fiyat: Yüksekten Düşüğe</option>
-                </select>
+        <div class="hero-visual">
+            <div class="glow-circle"></div>
+            <div class="float-card fc-1">
+                <span class="fc-emoji">👟</span>
+                <h4>Spor Ayakkabı</h4>
+                <div><span class="fc-price">₺899</span><span class="fc-old">₺1.299</span></div>
             </div>
-            <div id="product-grid"></div>
-        </main>
-    </div>
+            <div class="float-card fc-2">
+                <span class="fc-emoji">🎧</span>
+                <h4>Kablosuz Kulaklık</h4>
+                <div><span class="fc-price">₺1.249</span></div>
+            </div>
+            <div class="float-card fc-3">
+                <span class="fc-emoji">⌚</span>
+                <h4>Akıllı Saat</h4>
+                <div><span class="fc-price">₺2.199</span><span class="fc-old">₺2.799</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Kategoriler ===== -->
+    <section class="section" id="categories-section">
+        <div class="section-head">
+            <div>
+                <h2>Kategorilere Göz At</h2>
+                <p>İhtiyacın olan her şey kategorilere ayrılmış halde.</p>
+            </div>
+            <a href="shop.html" class="see-all">Tümünü Gör →</a>
+        </div>
+        <div id="landing-categories" class="cat-chips"></div>
+    </section>
+
+    <!-- ===== Ürün önizlemesi ===== -->
+    <section class="section" id="products-section">
+        <div class="section-head">
+            <div>
+                <h2>Ürünlerimizden</h2>
+                <p>Kataloğumuzdan birkaçı. Alışveriş için giriş yapman yeterli.</p>
+            </div>
+            <a href="shop.html" class="see-all">Tüm Ürünler →</a>
+        </div>
+        <div id="landing-products" class="landing-grid"></div>
+    </section>
+
+    <!-- ===== Özellikler ===== -->
+    <section class="features">
+        <div class="feature-card">
+            <div class="icon">🛒</div>
+            <h3>Geniş Ürün Yelpazesi</h3>
+            <p>Farklı kategorilerde binlerce ürün arasından dilediğini seç.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">🔒</div>
+            <h3>Güvenli Alışveriş</h3>
+            <p>Bilgilerin güvende; gönül rahatlığıyla sipariş ver.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">🚚</div>
+            <h3>Hızlı Teslimat</h3>
+            <p>Siparişlerin en kısa sürede kapına gelsin.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">↩️</div>
+            <h3>Kolay İade</h3>
+            <p>Beğenmezsen sorunsuz iade; alışveriş hep keyifli kalsın.</p>
+        </div>
+    </section>
+
+    <!-- ===== Alt CTA bandı ===== -->
+    <section class="cta-band">
+        <h2>Alışverişe hazır mısın?</h2>
+        <p>Hemen giriş yap, binlerce ürünü keşfetmeye başla.</p>
+        <a href="login.html" class="btn-gold">Giriş Yap ve Keşfet</a>
+    </section>
 
     <footer>
-        <p>E-Ticaret - Aslı'nın Projesi</p>
+        <p>Ongima - Aslı'nın Projesi</p>
     </footer>
 
     <script src="js/api.js"></script>
     <script src="js/site.js"></script>
-    <script src="js/home.js"></script>
+    <script src="js/landing.js"></script>
 </body>
 </html>

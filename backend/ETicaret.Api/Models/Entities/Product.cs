@@ -6,6 +6,7 @@ public class Product
     public string Name {get; set; } = string.Empty;
     public string? Description {get; set;}
     public decimal Price { get; set; }  // decimal finansal hesaplamalarda daha çok tercih edilir
+    public decimal? Cost { get; set; }   // Maliyet: kâr = efektif satış fiyatı - maliyet
     public int Stock { get; set; }
     public string? ImageUrl { get; set; }
     
@@ -14,8 +15,22 @@ public class Product
     // Silmek yerine pasife çekme imkanı.
     // Productscontroller'ın sadece aktifleri listelemesi.
 
+    // Ürünün kataloğa eklendiği an (UTC). "Yeni Gelenler" listesi bu tarihe göre süzülür:
+    // son 7 günde eklenenler. Veritabanı varsayılanı (SYSUTCDATETIME) sayesinde bu sütun
+    // eklenmeden önceki ürünler de tarihsiz kalmaz.
+    public DateTime CreatedAt { get; set; }
+
     public int CategoryId { get; set; }
     public Category Category { get; set; } = null!;
+
+    // Ana görsel (ImageUrl) dışındaki ek görseller — detay sayfasındaki slider için.
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
+
+    // Müşteri yorumları ve puanları — ortalama puan bunlardan hesaplanır.
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+
+    // Bu ürünü favorilerine ekleyen kullanıcıların kayıtları.
+    public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
 
     // İndirim planlama: DiscountPrice doluysa ve tarih aralığı tutuyorsa indirim aktiftir.
     // Tarihler null bırakılabilir -> süresiz indirim.

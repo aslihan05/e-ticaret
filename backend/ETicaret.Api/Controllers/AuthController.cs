@@ -1,11 +1,14 @@
 using ETicaret.Api.Models.Dtos;
 using ETicaret.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ETicaret.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Şifre denemesi yapılan tüm uçlar IP başına dakikada 8 istekle sınırlı (brute force koruması)
+[EnableRateLimiting("AuthLimit")]
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
@@ -32,12 +35,19 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        var result = await _authService.LoginAsync(dto);
-        if (result == null)
+        try
         {
-            return Unauthorized(new { message = "Kullanıcı adı veya şifre hatalı." });
-        }
+            var result = await _authService.LoginAsync(dto);
+            if (result == null)
+            {
+                return Unauthorized(new { message = "Kullanıcı adı veya şifre hatalı." });
+            }
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (BlockedUserException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
     }
 }

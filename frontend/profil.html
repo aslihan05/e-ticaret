@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hesabım - Ongima</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Koruma <head>'de ve replace ile: sayfa çizilmeden yönlendirir, geri tuşuyla dönülemez
+        if (!localStorage.getItem("token")) {
+            window.location.replace("login.html");
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1><a href="shop.html">🛍️ Ongima</a></h1>
+        <nav id="nav"></nav>
+    </header>
+
+    <div class="layout">
+        <main class="profile-page">
+            <a class="back-home" href="shop.html">← Ana Sayfaya Dön</a>
+            <h2>HESABIM</h2>
+
+            <!-- E-postası olmayan kullanıcılar için uyarı; profil yüklenince gösterilir -->
+            <div id="email-warning" class="profile-warning" style="display:none">
+                ⚠️ Hesabında e-posta adresi yok — bu yüzden sipariş bildirimlerini alamıyorsun.
+                Aşağıdan ekleyebilirsin.
+            </div>
+
+            <form id="profile-form" class="profile-card">
+                <p id="message" class="profile-message"></p>
+
+                <label for="username">Kullanıcı Adı</label>
+                <input type="text" id="username" disabled title="Kullanıcı adı değiştirilemez">
+                <p class="field-note">Siparişlerin ve kayıtların bu isme bağlı olduğu için değiştirilemez.</p>
+
+                <label for="email">E-posta <span class="required-mark">*</span></label>
+                <input type="email" id="email" required>
+                <p class="field-note">Sipariş durumu bildirimleri bu adrese gönderilir.</p>
+
+                <label for="fullname">Ad Soyad</label>
+                <input type="text" id="fullname" placeholder="Kargoda görünecek alıcı adı">
+
+                <label for="phone">Telefon</label>
+                <input type="tel" id="phone" placeholder="05XX XXX XX XX">
+
+                <label for="city">İl</label>
+                <input type="text" id="city" placeholder="Şehir">
+
+                <label for="district">İlçe</label>
+                <input type="text" id="district" placeholder="İlçe">
+
+                <label for="address">Açık Adres</label>
+                <textarea id="address" rows="3" placeholder="Mahalle, sokak, kapı no..."></textarea>
+                <p class="field-note">Teslimat adresin: sipariş verirken hazır gelir, her seferinde yeniden yazman gerekmez. Tek bir siparişi başka adrese göndermek istersen sepette değiştirebilirsin.</p>
+
+                <button type="submit" id="save-btn" class="add-btn">Kaydet</button>
+            </form>
+
+            <p class="profile-meta" id="profile-meta"></p>
+        </main>
+    </div>
+
+    <footer>
+        <p>Ongima - Aslı'nın Projesi</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/chatbot.js"></script>
+    <script src="js/profil.js"></script>
+</body>
+</html>

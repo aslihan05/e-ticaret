@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kayıt - E-Ticaret</title>
+    <title>Kayıt - Ongima</title>
     <link rel="stylesheet" href="css/login.css">
 </head>
 <body>
     <main class="login-page">
 
     <section class="brand-panel">
-        <h1>E-TİCARET</h1>
+        <h1>Ongima</h1>
         <p>Aradığın her şey, tek adreste.</p>
     </section>
 
@@ -22,8 +22,19 @@
             <label for="username">Kullanıcı Adı</label>
             <input type="text" id="username" required>
 
+            <label for="email">E-posta</label>
+            <input type="email" id="email" required>
+
+            <label for="phone">Telefon <span class="optional">(opsiyonel)</span></label>
+            <input type="tel" id="phone" placeholder="05XX XXX XX XX">
+
+            <label for="address">Adres <span class="optional">(opsiyonel)</span></label>
+            <textarea id="address" rows="2" placeholder="Sipariş verirken hazır gelsin"></textarea>
+
             <label for="password">Şifre</label>
-            <input type="password" id="password" required>
+            <input type="password" id="password" minlength="6" required
+                   title="En az 6 karakter">
+            <p class="field-hint">En az 6 karakter</p>
 
             <button type="submit">KAYIT OL</button>
 

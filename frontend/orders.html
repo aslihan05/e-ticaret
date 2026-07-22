@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Siparişlerim - E-Ticaret</title>
+    <title>Siparişlerim - Ongima</title>
     <link rel="stylesheet" href="css/style.css">
     <script>
         if (!localStorage.getItem("token")) {
@@ -13,25 +13,25 @@
 </head>
 <body>
     <header>
-        <h1><a href="index.html">🛍️ E-Ticaret</a></h1>
-        <a href="cart.html" class="cart-link" title="Sepetim">🛒<span id="cart-count" class="cart-count"></span></a>
+        <h1><a href="shop.html">🛍️ Ongima</a></h1>
         <nav id="nav"></nav>
     </header>
 
     <div class="layout">
         <main class="orders-page">
-            <a class="back-home" href="index.html">← Ana Sayfaya Dön</a>
+            <a class="back-home" href="shop.html">← Ana Sayfaya Dön</a>
             <h2>SİPARİŞLERİM</h2>
             <div id="orders-list"></div>
         </main>
     </div>
 
     <footer>
-        <p>E-Ticaret - Aslı'nın Projesi</p>
+        <p>Ongima - Aslı'nın Projesi</p>
     </footer>
 
     <script src="js/api.js"></script>
     <script src="js/site.js"></script>
+    <script src="js/chatbot.js"></script>
     <script src="js/orders.js"></script>
 </body>
 </html>
