@@ -2,7 +2,13 @@
 /*api.js projenin frontend'deki en önemli dosyası.backend'le konuşmanın bütün teknik ayrıntısını tek yerde toplar.*/ 
 
 
-const API_URL = "http://localhost:5113/api"
+// Geliştirmede frontend Live Server'dan (ör. 5500) servis edilir, API ayrı portta (5113) çalışır.
+// Canlıda ise frontend'i API'nin kendisi sunar (aynı origin) — bu yüzden göreli "/api" yeterli
+// ve doğrudur; "localhost" ziyaretçinin kendi bilgisayarını işaret ettiği için canlıda asla çalışmazdı.
+const API_URL =
+    (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+        ? "http://localhost:5113/api"
+        : "/api";
 
 function authHeaders() {
     const token = localStorage.getItem("token");

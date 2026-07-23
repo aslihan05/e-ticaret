@@ -38,6 +38,12 @@ public class Product
     public DateTime? DiscountStart { get; set; }
     public DateTime? DiscountEnd { get; set; }
 
+    // "Haftanın Fırsatı" vitrini: null ise ürün bu bölümde DEĞİL. Doluysa bölümdeki
+    // sıralamayı belirler (küçük önce). Bölüme eklenen ürünün indirimi gerçek indirim
+    // sistemiyle (DiscountPrice/Start/End) uygulanır; bu sütun yalnızca "hangi ürünler
+    // vitrinde ve hangi sırada" sorusunu yanıtlar, indirimin kendisini değil.
+    public int? WeeklyDealOrder { get; set; }
+
     public bool IsDiscountActive(DateTime now) =>
         DiscountPrice != null && DiscountPrice < Price
         && (DiscountStart == null || DiscountStart <= now)

@@ -10,59 +10,20 @@
     <header class="has-catmenu">
         <h1><a href="shop.html">🛍️ Ongima</a></h1>
 
-        <!-- Kategoriler & Filtreler artık kenar çubuğunda değil, Ongima'nın yanındaki bu
-             tetikleyiciden çapraz açılan "havalı" bir kutuda. Kutunun içeriği (kategori listesi +
-             filtreler) aynı id'lerle taşındığı için home.js olduğu gibi çalışır. -->
+        <!-- "Kategoriler" tetikleyicisi Ongima'nın yanında; tıklanınca yalnızca kategori
+             listesini içeren "havalı" bir kutu çapraz açılır. Filtreler artık burada değil,
+             bir kategori seçilince ekranın solunda açılan ayrı bir panelde. -->
         <div class="catmenu" id="catmenu">
             <button type="button" id="catmenu-trigger" class="catmenu-trigger"
                     aria-haspopup="true" aria-expanded="false" aria-controls="catmenu-box">
                 <span class="catmenu-icon" aria-hidden="true">☰</span>
-                <span>Kategoriler &amp; Filtreler</span>
+                <span>Kategoriler</span>
             </button>
 
             <div class="catmenu-box" id="catmenu-box">
-                <section class="sidebar-panel">
-                    <button type="button" class="panel-head" aria-expanded="true" aria-controls="panel-categories">
-                        <span>Kategoriler</span>
-                        <span class="panel-caret" aria-hidden="true">▾</span>
-                    </button>
-                    <div class="panel-body" id="panel-categories">
-                        <ul id="category-list"></ul>
-                    </div>
-                </section>
-
-                <section class="sidebar-panel">
-                    <button type="button" class="panel-head" aria-expanded="true" aria-controls="panel-filters">
-                        <span>Filtreler</span>
-                        <span class="panel-caret" aria-hidden="true">▾</span>
-                    </button>
-                    <div class="panel-body" id="panel-filters">
-                        <h3 class="filter-subtitle">Fiyat Aralığı</h3>
-                        <div class="price-filter">
-                            <input type="number" id="price-min" placeholder="Min" min="0">
-                            <input type="number" id="price-max" placeholder="Max" min="0">
-                        </div>
-
-                        <h3 class="filter-subtitle">Puan</h3>
-                        <select id="rating-filter" class="filter-select">
-                            <option value="">Tüm puanlar</option>
-                            <option value="4">★★★★ 4 yıldız ve üzeri</option>
-                            <option value="3">★★★ 3 yıldız ve üzeri</option>
-                            <option value="2">★★ 2 yıldız ve üzeri</option>
-                        </select>
-
-                        <h3 class="filter-subtitle">Durum</h3>
-                        <label class="filter-check">
-                            <input type="checkbox" id="filter-discount"> Sadece indirimli ürünler
-                        </label>
-                        <label class="filter-check">
-                            <input type="checkbox" id="filter-instock"> Sadece stokta olanlar
-                        </label>
-
-                        <button id="price-apply" class="add-btn filter-apply">Uygula</button>
-                        <button id="price-clear" class="filter-clear">Filtreleri Temizle</button>
-                    </div>
-                </section>
+                <div class="panel-body" id="panel-categories">
+                    <ul id="category-list"></ul>
+                </div>
             </div>
         </div>
 
@@ -70,9 +31,10 @@
         <nav id="nav"></nav>
     </header>
 
-    <div class="layout layout-shop">
-        <!-- Ongima'nın altında, canlı renkli yuvarlak hızlı butonlar (Trendyol tarzı):
-             tek tıkla en çok satanlar / en çok favori / sana özel öneriler listesine geçilir. -->
+    <div class="layout layout-shop" id="shop-layout">
+        <!-- Sezon indirimi bannerının ÜSTÜNDE, sayfanın ortasında yatay dizilen canlı renkli
+             yuvarlak hızlı butonlar (Trendyol tarzı): tek tıkla en çok satanlar / en çok favori /
+             sana özel öneriler / yeni gelenler listesine geçilir. -->
         <div class="quick-cats" id="quick-cats">
             <button type="button" class="quick-cat" data-mode="best-selling">
                 <span class="quick-cat-badge qc-best" aria-hidden="true">🔥</span>
@@ -92,14 +54,88 @@
             </button>
         </div>
 
-        <section class="banner">
-            <div class="banner-text">
-                <h2>Sezon indirimi başladı! 🔥</h2>
-                <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
-                <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
+        <!-- Filtre paneli: her zaman görünmez; bir kategori seçilince solda, hızlı butonların
+             eski yerinde açılır. Sade ve şık; sayfa kaydırılınca sabit (sticky) kalır. -->
+        <aside class="filter-panel" id="filter-panel" hidden aria-label="Ürün filtreleri">
+            <div class="filter-panel-head">
+                <span class="filter-panel-title">Filtreler</span>
+                <button type="button" id="filter-close" class="filter-close" aria-label="Filtreleri kapat">✕</button>
             </div>
-            <div id="sale-strip" class="sale-strip"></div>
-        </section>
+
+            <div class="filter-group">
+                <h3 class="filter-subtitle">Fiyat Aralığı</h3>
+                <div class="price-filter">
+                    <input type="number" id="price-min" placeholder="Min" min="0">
+                    <span class="price-sep">—</span>
+                    <input type="number" id="price-max" placeholder="Max" min="0">
+                </div>
+                <div class="price-presets" id="price-presets">
+                    <button type="button" class="price-chip" data-min="0" data-max="100">0–100 TL</button>
+                    <button type="button" class="price-chip" data-min="100" data-max="500">100–500 TL</button>
+                    <button type="button" class="price-chip" data-min="500" data-max="1000">500–1000 TL</button>
+                    <button type="button" class="price-chip" data-min="1000" data-max="">1000 TL+</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <h3 class="filter-subtitle">Puan</h3>
+                <select id="rating-filter" class="filter-select">
+                    <option value="">Tüm puanlar</option>
+                    <option value="4">★★★★ 4 yıldız ve üzeri</option>
+                    <option value="3">★★★ 3 yıldız ve üzeri</option>
+                    <option value="2">★★ 2 yıldız ve üzeri</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3 class="filter-subtitle">Durum</h3>
+                <label class="filter-check">
+                    <input type="checkbox" id="filter-discount"> Sadece indirimli ürünler
+                </label>
+                <label class="filter-check">
+                    <input type="checkbox" id="filter-instock"> Sadece stokta olanlar
+                </label>
+                <label class="filter-check">
+                    <input type="checkbox" id="filter-new"> Sadece yeni gelenler
+                </label>
+                <label class="filter-check">
+                    <input type="checkbox" id="filter-reviewed"> Sadece değerlendirilenler
+                </label>
+            </div>
+
+            <button id="price-apply" class="add-btn filter-apply">Uygula</button>
+            <button id="price-clear" class="filter-clear">Filtreleri Temizle</button>
+        </aside>
+
+        <!-- Vitrin satırı: solda sezon indirimi banner'ı, sağda "Haftanın Fırsatı" paneli.
+             Haftanın Fırsatı boşsa/pasifse (showcase.no-deal) banner tek başına tüm satırı kaplar. -->
+        <div class="showcase" id="showcase">
+            <section class="banner">
+                <div class="banner-text">
+                    <h2>Sezon indirimi başladı! 🔥</h2>
+                    <p>Seçili ürünlerde kaçırılmayacak fiyatlar</p>
+                    <a href="#product-grid" class="banner-btn">Alışverişe Başla</a>
+                </div>
+                <div id="sale-strip" class="sale-strip"></div>
+            </section>
+
+            <!-- Haftanın Fırsatı: geri sayım + adminin seçtiği ürünlerin slider'ı.
+                 Renkli, hareketli tasarım CSS'te (.weekly-deal). Veri gelene kadar gizli. -->
+            <section class="weekly-deal" id="weekly-deal" hidden aria-label="Haftanın Fırsatı">
+                <div class="wd-head">
+                    <div class="wd-title">
+                        <span class="wd-spark" aria-hidden="true">⚡</span>
+                        <h2 id="wd-title-text">Haftanın Fırsatı</h2>
+                    </div>
+                    <div class="wd-countdown" id="wd-countdown" role="timer" aria-live="polite"></div>
+                </div>
+                <div class="wd-slider">
+                    <button type="button" class="wd-nav wd-prev" id="wd-prev" aria-label="Önceki ürünler">‹</button>
+                    <div class="wd-track" id="wd-track"></div>
+                    <button type="button" class="wd-nav wd-next" id="wd-next" aria-label="Sonraki ürünler">›</button>
+                </div>
+            </section>
+        </div>
 
         <main>
             <div class="toolbar">

@@ -26,4 +26,15 @@
     <Content Include="Chatbot\magaza-kurallari.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Canlıda frontend'i API sunar: yayınlarken (publish) ../../frontend içeriği wwwroot'a kopyalanır.
+         Böylece tek site hem sayfaları hem /api'yi verir. Link metadata'sı hedef yolu belirler:
+         ör. ..\..\frontend\css\style.css → wwwroot\css\style.css.
+         CopyToOutputDirectory=Never: yerel "dotnet run" için kopyalanmaz (geliştirmede Live Server kullanılır). -->
+    <Content Include="..\..\frontend\**\*.*"
+             Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Never"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -148,6 +148,12 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+// Frontend'i (wwwroot) API ile AYNI adresten sun: "/" → index.html, "/css/..", "/js/.." statik gelir.
+// Kimlik doğrulamadan ÖNCE gelir ki sayfalar/varlıklar herkese açık servis edilsin ve
+// statik dosyalar için gereksiz yere loglama/yetki kontrolü çalışmasın.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseSwagger();
 app.UseSwaggerUI();
 

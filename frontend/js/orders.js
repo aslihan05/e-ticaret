@@ -43,7 +43,7 @@ function orderInfo(o) {
             msg = "🚚 Siparişin kargoya verildi, yolda! Kısa süre içinde adresine teslim edilecek.";
             break;
         case 4: // Teslim edildi
-            msg = "🎉 Siparişin teslim edildi. Afiyet olsun — ürünlere puan vermeyi unutma!";
+            msg = "🎉 Siparişin teslim edildi. Keyifli kullanımlar — ürünlere puan vermeyi unutma!";
             break;
         case 2: // Reddedildi
             msg = "❌ Siparişin reddedildi ve senden bir ücret alınmadı.";

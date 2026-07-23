@@ -14,6 +14,8 @@ let priceMax = null;
 let minRating = null;        // "en az X yıldız" filtresi (null = tüm puanlar)
 let discountOnly = false;    // "sadece indirimli ürünler"
 let inStockOnly = false;     // "sadece stokta olanlar"
+let newOnly = false;         // "sadece yeni gelenler" (son 7 gün)
+let reviewedOnly = false;    // "sadece değerlendirilenler" (en az bir yorumu olan)
 let currentPage = 1;
 let pageInfo = { page: 1, pageSize: 12, total: 0, totalPages: 0 };
 
@@ -27,6 +29,8 @@ function browseQuery() {
     if (minRating != null) params.set("minRating", minRating);
     if (discountOnly) params.set("discountOnly", "true");
     if (inStockOnly) params.set("inStockOnly", "true");
+    if (newOnly) params.set("newOnly", "true");
+    if (reviewedOnly) params.set("reviewedOnly", "true");
     if (currentSort !== "default") params.set("sort", currentSort);
     params.set("page", currentPage);
     return params.toString();
@@ -401,16 +405,111 @@ function onCategoryClick(e) {
 
     const id = li.dataset.id ? Number(li.dataset.id) : null;
 
-    // Çocuğu olan bir üst kategoriye tıklanınca alt kategoriler aç/kapa olur
-    if (id != null && allCategories.some(c => c.parentId === id)) {
+    // "Tümü" (ana sayfa görünümü): bir kategoriden çıkılıyorsa eklenen geçmiş adımını
+    // geri sararak (history.back → popstate → goHomeView) temiz biçimde ana sayfaya dön;
+    // böylece geçmişte sahte adım birikmez.
+    if (id == null) {
+        catmenuKapat();
+        if (categoryHistoryPushed) history.back();
+        else goHomeView();
+        return;
+    }
+
+    // Alt kategorisi olan bir üst kategoriye tıklamak "seçim" değil, "aç/kapa"dır:
+    // menü açık kalır ki kullanıcı beliren alt kategoriyi seçebilsin. Menü yalnızca
+    // nihai bir seçimde (alt kategorisi olmayan bir kategori) kapanır.
+    const hasChildren = allCategories.some(c => c.parentId === id);
+    if (hasChildren) {
         if (expandedParents.has(id)) expandedParents.delete(id);
         else expandedParents.add(id);
     }
 
     currentCategoryId = id;
     renderCategoryList();
+    // Vitrin öğeleri (hızlı butonlar / sezon indirimi / haftanın fırsatı) yalnızca
+    // ana sayfa görünümünde; kategori seçilince gizlenir, "Tümü"ye dönünce geri gelir.
+    updateHomeSectionsVisibility();
+    // Filtreler her zaman görünür değil: kullanıcı bir kategoriye dokununca solda açılır.
+    openFilterPanel();
+    // Ana sayfadan kategoriye ilk geçişte geçmişe tek adım ekle: Geri tuşu tek adımda
+    // login'e değil, ana sayfaya (Tümü) döndürsün.
+    pushCategoryHistory();
+    // Üst kategoriye tıklandıysa menüyü AÇIK bırak (alt kategori henüz seçilmedi);
+    // yaprak kategori seçildiyse iş bitti, kutuyu kapatıp ürünlere odaklan.
+    if (!hasChildren) catmenuKapat();
     resetAndLoad();
 }
+
+/* ===== Solda açılan filtre paneli ===== */
+
+// Panel varsayılan olarak gizli (hidden). Bir kategori seçilince açılır; ✕ ile kapanır.
+const filterPanel = document.getElementById("filter-panel");
+const shopLayout = document.getElementById("shop-layout");
+
+// Kategori seçiliyken (.category-active) vitrin öğeleri gizlenir; "Tümü"de geri gelir.
+// Ayrıca arama yapılırken veya bir hızlı buton (satan/favori/öneri/yeni) aktifken
+// (.showcase-hidden) sezon indirimi + Haftanın Fırsatı bloğu gizlenir: sonuçlar ekranın
+// çok altına kaymasın. Bu durumda hızlı butonlar görünür kalır (aktif olan kapatılabilsin).
+function updateHomeSectionsVisibility() {
+    shopLayout.classList.toggle("category-active", currentCategoryId != null);
+    const quickActive = !!document.querySelector(".quick-cat.active");
+    shopLayout.classList.toggle("showcase-hidden", quickActive || searchText !== "");
+}
+
+// "Geri" tuşu davranışı: ana sayfadan çıkılmış her durumda (kategori seçimi, hızlı buton
+// veya arama) Geri tuşu sayfadan çıkıp login'e dönmemeli; TEK adımda ana sayfaya dönmeli.
+// Bunun için ana sayfadan böyle bir görünüme ilk geçişte geçmişe TEK bir adım ekleriz; bu
+// adım "ana sayfada değilim" durumunu temsil eder. Geri tuşu (popstate) bu adımı tüketip ana
+// sayfa görünümünü geri getirir. Filtre panelinin açılıp kapanması artık geçmişe dokunmaz —
+// panel ile kategori zaten birlikte var olur.
+let categoryHistoryPushed = false;
+
+function pushCategoryHistory() {
+    if (!categoryHistoryPushed) {
+        history.pushState({ shopCategory: true }, "");
+        categoryHistoryPushed = true;
+    }
+}
+
+// Filtre paneli aç/kapa artık yalnızca görsel — geçmiş yönetimi kategoriye taşındı.
+function openFilterPanel() {
+    filterPanel.hidden = false;
+    shopLayout.classList.add("filters-open");
+}
+
+function closeFilterPanel() {
+    shopLayout.classList.remove("filters-open");
+    filterPanel.hidden = true;
+}
+
+// Ana sayfa görünümüne tam dönüş: kategori, hızlı buton ve arama temizlenir, panel kapanır,
+// vitrin öğeleri geri gelir ve tüm ürünler (Tümü) yeniden yüklenir.
+function goHomeView() {
+    currentCategoryId = null;
+    // Hızlı buton / arama da ana sayfadan çıkaran birer görünüm; Geri tuşu hepsini sıfırlar.
+    quickCatTemizle();
+    currentSort = "default";
+    document.getElementById("sort").value = "default";
+    searchText = "";
+    document.getElementById("search").value = "";
+    closeFilterPanel();
+    updateHomeSectionsVisibility();
+    renderCategoryList();
+    document.getElementById("list-title").textContent = "Tüm Ürünler";
+    resetAndLoad();
+}
+
+window.addEventListener("popstate", () => {
+    // Kategori görünümündeyken Geri: sayfadan çıkma, ana sayfaya dön.
+    if (categoryHistoryPushed || currentCategoryId != null) {
+        categoryHistoryPushed = false;
+        goHomeView();
+    }
+});
+
+// ✕ ile filtre panelini kapatmak yalnızca paneli gizler; kategori seçili kalır, dolayısıyla
+// vitrin öğeleri de gizli kalır (Geri tuşu yine ana sayfaya döndürür).
+document.getElementById("filter-close").addEventListener("click", () => closeFilterPanel());
 
 // Arama artık her tuşta sunucuya gidiyor. Debounce olmasaydı "elbise" yazan kullanıcı
 // 6 istek attırır, üstelik cevaplar sırasız dönerse ekranda "elb" sonucu kalabilirdi.
@@ -418,6 +517,10 @@ function onCategoryClick(e) {
 let aramaZamanlayici;
 document.getElementById("search").addEventListener("input", (e) => {
     searchText = e.target.value.trim();
+    // Vitrin, arama kutusu dolar dolmaz (istek beklenmeden) kalksın; kutu boşalınca geri gelir.
+    updateHomeSectionsVisibility();
+    // Arama da ana sayfadan çıkaran bir görünüm: Geri tuşu login'e değil, ana sayfaya dönsün.
+    if (searchText !== "") pushCategoryHistory();
     clearTimeout(aramaZamanlayici);
     aramaZamanlayici = setTimeout(resetAndLoad, 350);
 });
@@ -427,6 +530,8 @@ document.getElementById("sort").addEventListener("change", (e) => {
     // iki sıralama aynı anda geçerli olamaz.
     quickCatTemizle();
     currentSort = e.target.value;
+    // Hızlı buton iptal edildi: arama da yoksa vitrin geri gelir.
+    updateHomeSectionsVisibility();
     resetAndLoad();
 });
 
@@ -435,6 +540,8 @@ document.getElementById("price-apply").addEventListener("click", () => {
     const max = document.getElementById("price-max").value;
     priceMin = min === "" ? null : Number(min);
     priceMax = max === "" ? null : Number(max);
+    // Elle girilen aralık bir hazır çiple birebir örtüşmeyebilir; seçili çip vurgusunu kaldır.
+    for (const c of document.querySelectorAll(".price-chip")) c.classList.remove("active");
     resetAndLoad();
 });
 
@@ -455,31 +562,60 @@ document.getElementById("filter-instock").addEventListener("change", (e) => {
     resetAndLoad();
 });
 
+document.getElementById("filter-new").addEventListener("change", (e) => {
+    newOnly = e.target.checked;
+    resetAndLoad();
+});
+
+document.getElementById("filter-reviewed").addEventListener("change", (e) => {
+    reviewedOnly = e.target.checked;
+    resetAndLoad();
+});
+
+// Hazır fiyat aralığı çipleri: tek tıkla Min/Max kutularını doldurup filtreyi uygular.
+// Aynı çipe tekrar basmak aralığı kaldırır (seçili çipi bir aç/kapa düğmesi gibi kullanır).
+document.getElementById("price-presets").addEventListener("click", (e) => {
+    const chip = e.target.closest(".price-chip");
+    if (!chip) return;
+
+    const min = chip.dataset.min;
+    const max = chip.dataset.max;
+    const zatenAktif = chip.classList.contains("active");
+
+    for (const c of document.querySelectorAll(".price-chip")) c.classList.remove("active");
+
+    if (zatenAktif) {
+        priceMin = priceMax = null;
+        document.getElementById("price-min").value = "";
+        document.getElementById("price-max").value = "";
+    } else {
+        chip.classList.add("active");
+        priceMin = min === "" ? null : Number(min);
+        priceMax = max === "" ? null : Number(max);
+        document.getElementById("price-min").value = min;
+        document.getElementById("price-max").value = max;
+    }
+    resetAndLoad();
+});
+
 // "Filtreleri Temizle": fiyatla birlikte puan ve durum filtrelerini de sıfırlar,
 // aksi halde temizledim sanıp hâlâ süzülmüş liste görmek kafa karıştırırdı.
 document.getElementById("price-clear").addEventListener("click", () => {
     priceMin = priceMax = null;
     minRating = null;
-    discountOnly = inStockOnly = false;
+    discountOnly = inStockOnly = newOnly = reviewedOnly = false;
     document.getElementById("price-min").value = "";
     document.getElementById("price-max").value = "";
     document.getElementById("rating-filter").value = "";
     document.getElementById("filter-discount").checked = false;
     document.getElementById("filter-instock").checked = false;
+    document.getElementById("filter-new").checked = false;
+    document.getElementById("filter-reviewed").checked = false;
+    for (const c of document.querySelectorAll(".price-chip")) c.classList.remove("active");
     resetAndLoad();
 });
 
-// Kenar çubuğu panelleri (Kategoriler / Filtreler) başlığına tıklanınca açılıp kapanır.
-// Buton + aria-expanded ile: klavye ve ekran okuyucu bedavaya çalışır.
-for (const head of document.querySelectorAll(".sidebar-panel .panel-head")) {
-    head.addEventListener("click", () => {
-        const panel = head.closest(".sidebar-panel");
-        const acik = panel.classList.toggle("collapsed");
-        head.setAttribute("aria-expanded", String(!acik));
-    });
-}
-
-/* ===== Header'daki "Kategoriler & Filtreler" açılır kutusu ===== */
+/* ===== Header'daki "Kategoriler" açılır kutusu ===== */
 
 const catmenuWrap = document.getElementById("catmenu");
 const catmenuTrigger = document.getElementById("catmenu-trigger");
@@ -542,6 +678,11 @@ document.getElementById("quick-cats").addEventListener("click", (e) => {
         document.getElementById("list-title").textContent = QUICK_LABELS[mode] ?? "Ürünler";
     }
 
+    // Hızlı buton açıldıysa vitrini kaldır, kapatıldıysa (ve arama da yoksa) geri getir.
+    updateHomeSectionsVisibility();
+    // Hızlı buton listesi de ana sayfadan çıkarır: Geri tuşu tek adımda ana sayfaya dönsün,
+    // sayfadan (login'e) çıkmasın.
+    if (!zatenAktif) pushCategoryHistory();
     resetAndLoad();
 });
 
@@ -560,8 +701,125 @@ document.getElementById("product-grid").addEventListener("click", (e) => {
     addToCart(Number(btn.dataset.id), btn);
 });
 
+/* ===== Haftanın Fırsatı vitrini ===== */
+// Adminin bu hafta için seçtiği ürünler, gerçek indirimleriyle bir slider'da; üstte
+// indirimin kaç gün daha geçerli olduğunu gösteren geri sayım. Veri sunucudan gelir
+// (GET /weeklydeals); bölüm pasif ya da boşsa banner tek başına satırı kaplar.
+
+let wdCountdownTimer = null;
+// Karta tıklandığında detay kutusunu açabilmek için o anki vitrin ürünleri
+let weeklyProducts = [];
+
+async function loadWeeklyDeal() {
+    const showcase = document.getElementById("showcase");
+    const section = document.getElementById("weekly-deal");
+
+    let data;
+    try {
+        data = await apiGet("/weeklydeals");
+    } catch {
+        data = null;
+    }
+
+    // Aktif değil ya da hiç ürün yoksa bölümü gizle, banner tüm satırı kaplasın
+    if (!data || !data.isActive || !data.items || data.items.length === 0) {
+        section.hidden = true;
+        showcase.classList.add("no-deal");
+        return;
+    }
+
+    showcase.classList.remove("no-deal");
+    section.hidden = false;
+
+    document.getElementById("wd-title-text").textContent = data.title || "Haftanın Fırsatı";
+    weeklyProducts = data.items;
+    renderWeeklyDealItems(data.items);
+    startWeeklyCountdown(data.endsAt);
+}
+
+// Kartlar sezon indirimi şeridindekilerle birebir aynı: aynı .sale-card görünümü ve
+// aynı davranış — tıklayınca yeni sayfaya gitmek yerine ürün detay kutusu (modal)
+// açılır; sepete ekleme, favori ve puan bilgisi o kutunun içinde yaşar.
+function renderWeeklyDealItems(items) {
+    const track = document.getElementById("wd-track");
+    track.innerHTML = items.map(p => `
+        <button type="button" class="sale-card" data-id="${p.id}"
+                aria-label="${esc(p.name)} — detayı aç">
+            ${p.imageUrl
+                ? `<img src="${esc(p.imageUrl)}" alt="">`
+                : `<div class="img-placeholder">${esc(p.name[0])}</div>`}
+            <span class="discount-badge">-%${discountPercent(p)}</span>
+            <h4>${esc(p.name)}</h4>
+            <div>${priceHtml(p)}</div>
+        </button>`).join("");
+}
+
+// Karta tıklayınca sezon indirimi kartlarındaki gibi detay kutusunu aç
+document.getElementById("wd-track").addEventListener("click", (e) => {
+    const card = e.target.closest(".sale-card");
+    if (!card) return;
+    const p = weeklyProducts.find(x => x.id === Number(card.dataset.id));
+    if (p) openProductModal(p);
+});
+
+// Slider okları: her tıklamada TAM BİR kart ilerler (kart genişliği + aradaki 14px boşluk),
+// böylece her kaydırışta vitrine yalnızca bir yeni ürün girer.
+function scrollWeekly(dir) {
+    const track = document.getElementById("wd-track");
+    const card = track.querySelector(".sale-card");
+    const step = card ? card.getBoundingClientRect().width + 14 : 224;
+    track.scrollBy({ left: dir * step, behavior: "smooth" });
+}
+document.getElementById("wd-prev").addEventListener("click", () => scrollWeekly(-1));
+document.getElementById("wd-next").addEventListener("click", () => scrollWeekly(1));
+
+// Geri sayım: "kaç gün daha" öne çıkar, altında saat:dakika:saniye tıklar.
+function startWeeklyCountdown(endsAt) {
+    const box = document.getElementById("wd-countdown");
+    if (wdCountdownTimer) clearInterval(wdCountdownTimer);
+
+    if (!endsAt) {
+        box.innerHTML = `<span class="wd-cd-label">Süresiz fırsat</span>`;
+        return;
+    }
+
+    const end = new Date(endsAt).getTime();
+
+    const tick = () => {
+        const diff = end - Date.now();
+        if (diff <= 0) {
+            // Süre doldu: bölümü gizle (indirim de sunucuda düşmüştür)
+            clearInterval(wdCountdownTimer);
+            document.getElementById("weekly-deal").hidden = true;
+            document.getElementById("showcase").classList.add("no-deal");
+            return;
+        }
+        const gun = Math.floor(diff / 86400000);
+        const saat = Math.floor((diff % 86400000) / 3600000);
+        const dk = Math.floor((diff % 3600000) / 60000);
+        const sn = Math.floor((diff % 60000) / 1000);
+        const iki = (n) => String(n).padStart(2, "0");
+        box.innerHTML = `
+            <span class="wd-cd-label">Bitmesine</span>
+            <span class="wd-cd-days"><b>${gun}</b> gün</span>
+            <span class="wd-cd-clock">${iki(saat)}:${iki(dk)}:${iki(sn)}</span>`;
+    };
+
+    tick();
+    wdCountdownTimer = setInterval(tick, 1000);
+}
+
 setupNav();
 updateCartCount();
+// Tanıtımdan "shop.html?category=3" gibi bir kategoriyle gelindiyse filtre paneli açık başlar
+// ve vitrin öğeleri gizli başlar (doğrudan kategoriyle gelindiği için ana sayfa görünümü değil).
+// Geçmişe bir adım eklenir ki Geri tuşu önce ana sayfa görünümüne (Tümü) dönsün.
+if (currentCategoryId) {
+    openFilterPanel();
+    pushCategoryHistory();
+}
+updateHomeSectionsVisibility();
 loadProducts();
 loadSaleStrip();
+loadWeeklyDeal();
 loadCategories();

@@ -74,6 +74,9 @@ function setupNav() {
     // Hediye kutusu bugün açıldıysa dikkat çekici efekt (titreşim/parıltı) kapatılır:
     // hatırlatmanın amacı kutuyu açtırmaktı, açıldıysa artık gerekmez. mysterybox.js
     // kutu açılınca/cooldown'da bu işareti bugünün tarihiyle localStorage'a yazar.
+    // Not: localStorage tek başına güvenilir değil (başka cihaz, temizlenmiş önbellek,
+    // ya da kutunun chatbot üzerinden açılması). İlk render'ı bu hızlı işaretle yapıp
+    // hemen ardından sunucudan teyit alırız (aşağıdaki gitfDurumTeyit).
     const hediyeAcildi = localStorage.getItem("giftOpenedDate") === new Date().toDateString();
     const giftClass = hediyeAcildi ? "gift-link opened" : "gift-link";
     const giftTitle = hediyeAcildi ? "Hediye Kutusu" : "Hediye Kutusu — açmayı unutma!";
@@ -141,6 +144,28 @@ function setupNav() {
             kapat();
             openCartDrawer();
         });
+    }
+
+    giftDurumTeyit();
+}
+
+// Sunucudan bugünkü hediye kutusu durumunu teyit eder. localStorage bayrağı bugünü
+// göstermiyorsa (stale/eksik) ama sunucu "bugün zaten açıldı" diyorsa, nav'daki 🎁
+// linkinin titreşimini susturur ve bayrağı düzeltir; böylece müşteri ödülünü aldıysa
+// kutu günün geri kalanında (kutular yenilenene kadar) titremez.
+async function giftDurumTeyit() {
+    const link = document.querySelector(".gift-link");
+    if (!link || link.classList.contains("opened")) return;   // zaten susturulmuş
+
+    try {
+        const durum = await apiGet("/mysterybox");
+        if (durum && durum.canOpen === false) {
+            link.classList.add("opened");
+            link.title = "Hediye Kutusu";
+            localStorage.setItem("giftOpenedDate", new Date().toDateString());
+        }
+    } catch {
+        // Durum alınamazsa mevcut (localStorage'a dayalı) haliyle bırak.
     }
 }
 

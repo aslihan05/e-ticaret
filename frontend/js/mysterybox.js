@@ -22,7 +22,12 @@ async function init() {
     try {
         const durum = await apiGet("/mysterybox");
         if (durum.canOpen) {
-            renderBoxes();
+            // Kaç kutu çizileceğine sunucu karar verir (admin ayarı + havuzdaki ödül sayısı)
+            renderBoxes(durum.boxCount ?? 3);
+        } else if (durum.gameClosed) {
+            // Oyun admin tarafından kapatılmış (ya da havuzda ödül kalmamış): "yarın gel"
+            // demek yanıltıcı olurdu, çünkü ne zaman açılacağı belli değil.
+            renderClosed();
         } else {
             hediyeAcildiIsaretle();   // bugünkü kutu zaten açılmış
             renderCooldown(durum);
@@ -32,15 +37,15 @@ async function init() {
     }
 }
 
-// Kapalı üç kutuyu basar.
-function renderBoxes() {
+// Kapalı kutuları basar (adet sunucudan gelir).
+function renderBoxes(adet = 3) {
     secimYapildi = false;
     resultBox.hidden = true;
     resultBox.innerHTML = "";
     stage.classList.remove("locked");
     stage.innerHTML = "";
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < adet; i++) {
         const box = document.createElement("button");
         box.type = "button";
         box.className = "gift-box";
@@ -94,9 +99,11 @@ async function openBox(box) {
     revealPrize(box, sonuc.won, true);
     box.classList.add("is-opened", "is-winner");
 
-    // Diğer iki kutu: yarı saydam olur ve kaçırılan ödülleri gösterir (tıklanamaz).
+    // Diğer kutular: yarı saydam olur ve kaçırılan ödülleri gösterir (tıklanamaz).
+    // Sunucu kutu sayısı kadar "kaçırılan" döner; eksik kalırsa o kutu boş açılmasın diye atlanır.
     digerler.forEach((b, i) => {
         const kacirilan = sonuc.missed[i];
+        if (!kacirilan) return;
         setTimeout(() => {
             revealPrize(b, kacirilan, false);
             b.classList.add("is-opened", "is-missed");
@@ -171,6 +178,20 @@ function renderCooldown(durum) {
             ${odul}
             <p>Yeni bir hediye kutusu için <strong>${esc(kalan)}</strong> sonra tekrar gel.</p>
             <a href="coupons.html" class="add-btn">Kuponlarıma Git</a>
+        </div>`;
+}
+
+// Oyun yönetici tarafından kapatılmışsa gösterilen ekran.
+function renderClosed() {
+    secimYapildi = true;
+    stage.classList.remove("locked");
+    resultBox.hidden = true;
+    stage.innerHTML = `
+        <div class="mystery-cooldown">
+            <div class="cd-lock">🎁</div>
+            <h3>Hediye kutuları şu an kapalı</h3>
+            <p>Yeni sürprizler için kısa süre sonra tekrar uğra!</p>
+            <a href="shop.html" class="add-btn">Alışverişe Devam Et</a>
         </div>`;
 }
 

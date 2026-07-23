@@ -27,6 +27,9 @@ public class AppDbContext : DbContext
     public DbSet<Favorite> Favorites {get; set;}
     public DbSet<Coupon> Coupons {get; set;}
     public DbSet<CouponUser> CouponUsers {get; set;}
+    public DbSet<WeeklyDealConfig> WeeklyDealConfigs {get; set;}
+    public DbSet<MysteryBoxConfig> MysteryBoxConfigs {get; set;}
+    public DbSet<MysteryBoxPrize> MysteryBoxPrizes {get; set;}
 
      protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +135,13 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(cu => cu.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Hediye kutusu ödülleri de para taşır (yüzde ya da TL) — kupon alanlarıyla aynı hassasiyet.
+        modelBuilder.Entity<MysteryBoxPrize>(entity =>
+        {
+            entity.Property(p => p.Value).HasPrecision(18, 2);
+            entity.Property(p => p.MinOrderTotal).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Order>(entity =>

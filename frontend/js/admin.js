@@ -25,7 +25,9 @@ const LOADERS = {
     orders: loadAdminOrders,
     products: loadAdminProducts,
     discounts: loadAdminDiscounts,
+    weekly: loadWeeklyDealAdmin,
     coupons: loadAdminCoupons,
+    mystery: loadMysteryBoxAdmin,
     categories: loadAdminCategories,
     users: loadAdminUsers,
     logs: loadAdminLogs,
@@ -128,6 +130,17 @@ async function loadAdminOrders() {
 
 const money = (v) => `${(v ?? 0).toLocaleString("tr-TR")} TL`;
 const sayi = (v) => (v ?? 0).toLocaleString("tr-TR");
+
+// Grafik üstündeki değer etiketleri için kısa para biçimi: 1.234.567 TL yerine "1,23 M".
+// Tam rakam grafikteki tooltip'te ve alttaki kırılım tablosunda zaten var; sütunun üstünde
+// okunabilirlik uzunluktan daha önemli.
+const kisaPara = (v) => {
+    const n = Number(v ?? 0);
+    const mutlak = Math.abs(n);
+    if (mutlak >= 1_000_000) return `${(n / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} M`;
+    if (mutlak >= 1_000) return `${(n / 1_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} B`;
+    return n.toLocaleString("tr-TR", { maximumFractionDigits: 0 });
+};
 
 // İl paneli görünürken (veya sipariş işlemi sonrası) özeti tazele
 function refreshRegionIfVisible() {
@@ -592,10 +605,13 @@ function renderProductRows(products) {
     const rows = products.map(p => {
         // Geçmiş her ürün için görünür (pasif ürünün de satış tarihçesi anlamlıdır)
         const history = `<button class="btn-history" data-id="${p.id}" title="Sipariş tarihçesi">📜 Geçmiş</button>`;
+        // Pasifleştir her zaman tıklanabilir: stok varsa buton kilitlenmez, yalnızca
+        // onay ister (yanlışlıkla kapatmaya karşı koruma orada durur).
         const actions = p.isActive
             ? `<button class="btn-edit" data-id="${p.id}">Düzenle</button>
                ${history}
-               <button class="btn-delete" data-id="${p.id}" ${p.stock > 0 ? `title="Stokta ${p.stock} adet var — önce stoğu 0 yapmalısın" disabled` : ""}>Pasifleştir</button>`
+               <button class="btn-delete" data-id="${p.id}" data-stock="${p.stock}"
+                 title="${p.stock > 0 ? `Stokta ${p.stock} adet var — onay istenecek` : "Ürünü satıştan kaldır"}">Pasifleştir</button>`
             : `${history}
                <button class="btn-activate" data-id="${p.id}">Aktifleştir</button>`;
         return `<tr class="${p.isActive ? "" : "row-inactive"}">
@@ -716,8 +732,14 @@ document.getElementById("admin-products").addEventListener("click", async (e) =>
     }
 
     if (deleteBtn) {
+        // Stoklu ürünü kapatmak sayılan malı kayıtta yok göstermek demek; bu yüzden
+        // engellemek yerine açıkça onaylatıyoruz (sunucu da force olmadan reddeder).
+        const stok = Number(deleteBtn.dataset.stock || 0);
+        if (stok > 0 && !confirm(`Bu üründen stokta ${stok} adet görünüyor.\nYine de satıştan kaldırılsın (pasife alınsın) mı?\n\nStok bilgisi silinmez; ürün yalnızca listelerden düşer ve istediğinde tekrar aktifleştirebilirsin.`)) {
+            return;
+        }
         try {
-            await apiDelete(`/products/${deleteBtn.dataset.id}`);
+            await apiDelete(`/products/${deleteBtn.dataset.id}${stok > 0 ? "?force=true" : ""}`);
             showMessage("Ürün pasife alındı; istersen tablodan tekrar aktifleştirebilirsin.");
             loadAdminProducts();
         } catch (err) {
@@ -924,6 +946,278 @@ async function applyBulkDiscount(clear) {
 }
 document.getElementById("bulk-apply").addEventListener("click", () => applyBulkDiscount(false));
 document.getElementById("bulk-clear").addEventListener("click", () => applyBulkDiscount(true));
+
+/* ===== Haftanın Fırsatı ===== */
+// Adminin bu hafta için seçtiği ürünler + oranları + geri sayım. İndirimler gerçek
+// indirimdir (sunucu ürünün DiscountPrice/Start/End alanlarına yazar).
+
+// Vitrinde olan ürün id'leri (seçici bunları "eklendi" olarak işaretler)
+let wdCurrentIds = new Set();
+
+async function loadWeeklyDealAdmin() {
+    await fillWeeklyFilterCategory();
+    await renderWeeklyCurrent();
+    await applyWeeklyPicker();
+}
+
+// datetime-local <input> ile UTC ISO arasında çeviri. Kutu yerel saati gösterir/alır;
+// sunucuya UTC gider, sunucudan gelen UTC yerel kutuya çevrilir.
+function isoToLocalInput(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const off = d.getTimezoneOffset() * 60000;
+    return new Date(d - off).toISOString().slice(0, 16);
+}
+function localInputToIso(val) {
+    return val ? new Date(val).toISOString() : null;
+}
+
+async function renderWeeklyCurrent() {
+    const data = await apiGet("/weeklydeals/admin");
+
+    // Ayar kutularını doldur
+    document.getElementById("wd-title").value = data.title ?? "";
+    document.getElementById("wd-starts").value = isoToLocalInput(data.startsAt);
+    document.getElementById("wd-ends").value = isoToLocalInput(data.endsAt);
+    document.getElementById("wd-active").checked = !!data.isActive;
+
+    wdCurrentIds = new Set(data.items.map(i => i.productId));
+
+    const container = document.getElementById("wd-current");
+    if (!data.items.length) {
+        container.innerHTML = "<p class='empty'>Vitrinde henüz ürün yok. Aşağıdan ekleyebilirsin.</p>";
+        return;
+    }
+
+    const rows = data.items.map(i => `
+        <tr>
+            <td>${i.imageUrl ? `<img src="${esc(i.imageUrl)}" alt="">` : "-"}</td>
+            <td>${esc(i.name)}</td>
+            <td>${i.categoryName ? esc(i.categoryName) : "-"}</td>
+            <td>${i.price} TL</td>
+            <td>
+                <input type="number" class="wd-pct-input" min="1" max="99" value="${i.discountPercent}" style="width:64px">
+                <button class="btn-stock wd-save-pct" data-id="${i.productId}" title="Oranı kaydet">✓</button>
+            </td>
+            <td>${i.discountedPrice != null ? i.discountedPrice + " TL" : "-"}</td>
+            <td>
+                <input type="number" class="wd-order-input" value="${i.sortOrder}" style="width:56px">
+                <button class="btn-stock wd-save-order" data-id="${i.productId}" data-pct="${i.discountPercent}" title="Sırayı kaydet">⇅</button>
+            </td>
+            <td><button class="btn-delete wd-remove" data-id="${i.productId}">🗑</button></td>
+        </tr>`).join("");
+
+    container.innerHTML = `<table class="admin-table">
+        <thead><tr><th></th><th>Ürün</th><th>Kategori</th><th>Normal</th><th>İndirim %</th><th>Fırsat Fiyatı</th><th>Sıra</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+}
+
+// Ayarları kaydet
+document.getElementById("wd-save-settings").addEventListener("click", async () => {
+    try {
+        const startsAt = localInputToIso(document.getElementById("wd-starts").value);
+        await apiPut("/weeklydeals/admin/settings", {
+            title: document.getElementById("wd-title").value.trim(),
+            startsAt,
+            endsAt: localInputToIso(document.getElementById("wd-ends").value),
+            isActive: document.getElementById("wd-active").checked
+        });
+        // Başlangıcı ileri bir tarihe alındıysa bölüm şu an vitrinde görünmeyecek: admin
+        // "kaydettim ama sitede yok" diye aramasın diye bunu açıkça söylüyoruz.
+        const ileride = startsAt && new Date(startsAt) > new Date();
+        showMessage(ileride
+            ? `Ayarlar kaydedildi. Kampanya ${new Date(startsAt).toLocaleString("tr-TR")} tarihinde kendiliğinden başlayacak; o ana kadar vitrinde görünmez.`
+            : "Ayarlar kaydedildi.");
+        await renderWeeklyCurrent();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+// Vitrindeki ürünler tablosundaki işlemler (oran kaydet / sıra kaydet / kaldır)
+document.getElementById("wd-current").addEventListener("click", async (e) => {
+    const savePct = e.target.closest(".wd-save-pct");
+    const saveOrder = e.target.closest(".wd-save-order");
+    const remove = e.target.closest(".wd-remove");
+    if (!savePct && !saveOrder && !remove) return;
+
+    const row = e.target.closest("tr");
+    try {
+        if (savePct) {
+            const pct = Number(row.querySelector(".wd-pct-input").value);
+            const order = Number(row.querySelector(".wd-order-input").value);
+            await apiPost("/weeklydeals/admin/items", { productId: Number(savePct.dataset.id), percent: pct, sortOrder: order });
+            showMessage("Oran güncellendi.");
+        } else if (saveOrder) {
+            const order = Number(row.querySelector(".wd-order-input").value);
+            const pct = Number(row.querySelector(".wd-pct-input").value);
+            await apiPost("/weeklydeals/admin/items", { productId: Number(saveOrder.dataset.id), percent: pct, sortOrder: order });
+            showMessage("Sıra güncellendi.");
+        } else if (remove) {
+            await apiDelete(`/weeklydeals/admin/items/${Number(remove.dataset.id)}`);
+            showMessage("Ürün vitrinden çıkarıldı.");
+        }
+        await renderWeeklyCurrent();
+        await applyWeeklyPicker();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+// ---- Ürün seçici (filtreli) ----
+async function fillWeeklyFilterCategory() {
+    const cats = await apiGet("/categories");
+    const parents = cats.filter(c => c.parentId == null);
+    const options = parents.map(p => {
+        const children = cats.filter(c => c.parentId === p.id)
+            .map(ch => `<option value="${ch.id}">&nbsp;&nbsp;↳ ${esc(ch.name)}</option>`).join("");
+        return `<option value="${p.id}">${esc(p.name)}</option>` + children;
+    }).join("");
+    document.getElementById("wd-f-category").innerHTML =
+        `<option value="">Tüm kategoriler</option>` + options;
+}
+
+async function applyWeeklyPicker() {
+    const filters = [];
+    const name = document.getElementById("wd-f-name").value.trim();
+    const minP = document.getElementById("wd-f-min-price").value;
+    const maxP = document.getElementById("wd-f-max-price").value;
+    const cat = document.getElementById("wd-f-category").value;
+
+    // Yalnızca aktif ürünler vitrine eklenebilir
+    filters.push({ field: "IsActive", op: "eq", value: "true" });
+    if (name) filters.push({ field: "Name", op: "contains", value: name });
+    if (minP) filters.push({ field: "Price", op: "gte", value: minP });
+    if (maxP) filters.push({ field: "Price", op: "lte", value: maxP });
+    if (cat) filters.push({ field: "CategoryId", op: "eq", value: cat });
+
+    const products = await apiPost("/products/filter", { filters, sortBy: "Id", sortDir: "asc" });
+    renderWeeklyPicker(products);
+}
+
+function renderWeeklyPicker(products) {
+    const container = document.getElementById("wd-picker");
+    if (!products.length) {
+        container.innerHTML = "<p class='empty'>Filtreyle eşleşen ürün yok.</p>";
+        return;
+    }
+
+    const rows = products.map(p => {
+        const eklendi = wdCurrentIds.has(p.id);
+        // Zaten indirimli ürünlerde eski/yeni fiyat birlikte gösterilir (priceCell: Ürünler
+        // ve İndirimler sekmeleriyle aynı biçim). Böylece admin ürünün güncel fiyatını görür.
+        const indirimEtiket = (p.hasDiscount && !eklendi) ? ' <span class="badge-discount">indirimli</span>' : "";
+        return `<tr class="${eklendi ? "row-inactive" : ""}">
+            <td><input type="checkbox" class="wd-pick" data-id="${p.id}" ${eklendi ? "disabled" : ""}></td>
+            <td>${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="">` : "-"}</td>
+            <td>${esc(p.name)}${eklendi ? ' <span class="badge-inactive">vitrinde</span>' : indirimEtiket}</td>
+            <td>${p.category ? (p.category.parentName ? esc(p.category.parentName) + " › " : "") + esc(p.category.name) : "-"}</td>
+            <td>${priceCell(p)}</td>
+            <td><input type="number" class="wd-add-pct" min="1" max="99" value="20" style="width:64px"></td>
+            <td><button class="add-btn wd-add-btn" data-id="${p.id}" ${eklendi ? "disabled" : ""}>${eklendi ? "Eklendi" : "Ekle"}</button></td>
+        </tr>`;
+    }).join("");
+
+    container.innerHTML = `<table class="admin-table">
+        <thead><tr><th></th><th></th><th>Ürün</th><th>Kategori</th><th>Fiyat</th><th>İndirim %</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+
+    // Filtre yenilenince "görünenleri seç" kutusu sıfırlanır
+    document.getElementById("wd-select-all").checked = false;
+    wdSecimSayaciTazele();
+}
+
+// Seçili ürün sayısı: "Tümünü Seç" sonrası kaç ürüne indirim uygulanacağı görünsün.
+function wdSecimSayaciTazele() {
+    const n = document.querySelectorAll("#wd-picker .wd-pick:checked:not(:disabled)").length;
+    document.getElementById("wd-select-count").textContent = `${n} ürün seçili`;
+}
+
+function wdTumunuIsaretle(secili) {
+    document.querySelectorAll("#wd-picker .wd-pick:not(:disabled)").forEach(c => c.checked = secili);
+    wdSecimSayaciTazele();
+}
+
+// "Görünenleri seç": vitrinde olmayan (disabled olmayan) tüm satırları işaretle/kaldır
+document.getElementById("wd-select-all").addEventListener("change", (e) => wdTumunuIsaretle(e.target.checked));
+
+document.getElementById("wd-picker").addEventListener("change", (e) => {
+    if (e.target.classList.contains("wd-pick")) wdSecimSayaciTazele();
+});
+
+// "Tümünü Seç": filtreyi temizleyip listeyi bütün aktif ürünlerle yeniden kurar, sonra
+// vitrinde olmayan HER satırı işaretler. Filtreyi temizlemeden işaretleseydik yalnızca o an
+// ekranda olanlar seçilirdi — "hepsi" demek olmazdı.
+document.getElementById("wd-select-every").addEventListener("click", async () => {
+    ["wd-f-name", "wd-f-min-price", "wd-f-max-price", "wd-f-category"]
+        .forEach(id => { document.getElementById(id).value = ""; });
+    await applyWeeklyPicker();
+    wdTumunuIsaretle(true);
+    document.getElementById("wd-select-all").checked = true;
+    const n = document.querySelectorAll("#wd-picker .wd-pick:checked:not(:disabled)").length;
+    showMessage(n ? `${n} ürün seçildi. Oranı girip “Seçilenleri Ekle”ye bas.` : "Eklenebilecek yeni ürün yok.", n > 0);
+});
+
+document.getElementById("wd-select-none").addEventListener("click", () => {
+    wdTumunuIsaretle(false);
+    document.getElementById("wd-select-all").checked = false;
+});
+
+// Toplu ekle: işaretli ürünlere tek oranla indirim uygulanıp hepsi vitrine eklenir
+document.getElementById("wd-bulk-add").addEventListener("click", async () => {
+    const ids = [...document.querySelectorAll("#wd-picker .wd-pick:checked:not(:disabled)")].map(c => Number(c.dataset.id));
+    if (!ids.length) {
+        showMessage("Ürün seçilmedi.", false);
+        return;
+    }
+    const pct = Number(document.getElementById("wd-bulk-pct").value);
+    if (!(pct >= 1 && pct <= 99)) {
+        showMessage("İndirim oranı 1-99 arasında olmalı.", false);
+        return;
+    }
+    try {
+        const r = await apiPost("/weeklydeals/admin/items/bulk", { productIds: ids, percent: pct });
+        showMessage(r.message || "Ürünler eklendi.");
+        await renderWeeklyCurrent();
+        await applyWeeklyPicker();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+document.getElementById("wd-picker").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".wd-add-btn");
+    if (!btn || btn.disabled) return;
+    const row = e.target.closest("tr");
+    const pct = Number(row.querySelector(".wd-add-pct").value);
+    if (!(pct >= 1 && pct <= 99)) {
+        showMessage("İndirim oranı 1-99 arasında olmalı.", false);
+        return;
+    }
+    try {
+        await apiPost("/weeklydeals/admin/items", { productId: Number(btn.dataset.id), percent: pct });
+        showMessage("Ürün vitrine eklendi.");
+        await renderWeeklyCurrent();
+        await applyWeeklyPicker();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+// Filtre: metin/sayı kutuları yazma durunca (250 ms), kategori anında
+let weeklyFilterTimer;
+["wd-f-name", "wd-f-min-price", "wd-f-max-price"].forEach(id => {
+    document.getElementById(id).addEventListener("input", () => {
+        clearTimeout(weeklyFilterTimer);
+        weeklyFilterTimer = setTimeout(applyWeeklyPicker, 250);
+    });
+});
+document.getElementById("wd-f-category").addEventListener("change", applyWeeklyPicker);
+document.getElementById("wd-f-clear").addEventListener("click", () => {
+    ["wd-f-name", "wd-f-min-price", "wd-f-max-price"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("wd-f-category").value = "";
+    applyWeeklyPicker();
+});
 
 /* ===== Kategoriler ===== */
 
@@ -1365,9 +1659,15 @@ function barChart(items, fmt) {
 }
 
 // --- Günlük gelir/kâr trend grafiği (saf SVG çizgi + alan) ---
+// Grafik yalnızca "şeklin" değil, RAKAMIN da okunduğu bir tablo gibi çalışsın diye
+// üç katman veri taşır: (1) solda ölçek çizgileri ve değerleri, (2) noktaların üzerinde
+// değer etiketleri, (3) altta aralığın özeti. Nokta etiketleri kalabalık yapmasın diye
+// gün sayısı azken hepsi, çokken yalnızca kritik günler (ilk / zirve / son) yazılır;
+// her günün tam değeri fare ipucunda (title) zaten duruyor.
 function trendChart(trend) {
     if (!trend || trend.length === 0) return "<p class='empty'>Bu aralıkta satış verisi yok.</p>";
-    const W = 760, H = 240, padL = 10, padR = 10, padT = 14, padB = 28;
+    // padL büyüdü: sol tarafta ölçek (y ekseni) değerleri için yer açıldı.
+    const W = 760, H = 240, padL = 58, padR = 16, padT = 22, padB = 28;
     const n = trend.length;
     const maxRev = Math.max(...trend.map(t => Math.max(t.revenue, t.profit)), 1);
     const X = (i) => padL + (n === 1 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (n - 1));
@@ -1377,28 +1677,73 @@ function trendChart(trend) {
     const profPts = trend.map((t, i) => `${X(i).toFixed(1)},${Y(t.profit).toFixed(1)}`).join(" ");
     const areaPts = `${X(0).toFixed(1)},${Y(0).toFixed(1)} ${revPts} ${X(n - 1).toFixed(1)},${Y(0).toFixed(1)}`;
 
-    // Noktalar üzerine gün+değer ipucu (title)
+    // Ölçek: 0'dan zirveye dört yatay çizgi + solunda değerleri. Bunlar olmadan çizginin
+    // yüksekliği "büyük/küçük" dışında bir şey söylemiyordu.
+    const grid = [0, 0.25, 0.5, 0.75, 1].map(k => {
+        const v = maxRev * k;
+        const y = Y(v);
+        return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" class="trend-grid"></line>
+                <text x="${padL - 6}" y="${(y + 3.5).toFixed(1)}" class="trend-ylabel" text-anchor="end">${esc(kisaPara(v))}</text>`;
+    }).join("");
+
+    // Değer etiketi yazılacak günler: az günde hepsi, çok günde ilk / zirve / son.
+    const zirve = trend.reduce((enb, t, i) => t.revenue > trend[enb].revenue ? i : enb, 0);
+    const etiketli = n <= 8
+        ? trend.map((_, i) => i)
+        : [...new Set([0, zirve, n - 1])];
+
+    // Noktalar: gelir çizgisinde dolu, kâr çizgisinde küçük halka. İpucu (title) her günün
+    // tam gelir/kâr/sipariş değerini verir.
     const dots = trend.map((t, i) =>
         `<circle cx="${X(i).toFixed(1)}" cy="${Y(t.revenue).toFixed(1)}" r="3" class="trend-dot">
             <title>${fmtDate(t.date).split(" ")[0]} • Gelir ${money(t.revenue)} • Kâr ${money(t.profit)} • ${t.orders} sipariş</title>
+        </circle>
+        <circle cx="${X(i).toFixed(1)}" cy="${Y(t.profit).toFixed(1)}" r="2.5" class="trend-dot-prof">
+            <title>${fmtDate(t.date).split(" ")[0]} • Kâr ${money(t.profit)}</title>
         </circle>`).join("");
+
+    // Nokta değerleri: gelir noktanın üstüne, kâr altına — iki çizgi üst üste bindiğinde
+    // rakamlar birbirinin üzerine yazılmasın diye ters yönlere kaçırılıyor.
+    const pointLabels = etiketli.map(i => {
+        const t = trend[i];
+        const anchor = i === 0 ? "start" : (i === n - 1 ? "end" : "middle");
+        return `<text x="${X(i).toFixed(1)}" y="${(Y(t.revenue) - 7).toFixed(1)}" class="trend-vlabel rev" text-anchor="${anchor}">${esc(kisaPara(t.revenue))}</text>
+                <text x="${X(i).toFixed(1)}" y="${(Y(t.profit) + 13).toFixed(1)}" class="trend-vlabel prof" text-anchor="${anchor}">${esc(kisaPara(t.profit))}</text>`;
+    }).join("");
 
     // x ekseninde ilk / orta / son tarih
     const labelIdx = n === 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
     const xLabels = [...new Set(labelIdx)].map(i =>
         `<text x="${X(i).toFixed(1)}" y="${H - 8}" class="trend-xlabel" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${fmtDate(trend[i].date).split(" ")[0]}</text>`).join("");
 
+    // Aralığın özeti: grafiğe bakan kişinin ilk soracağı toplam/ortalama/zirve rakamları.
+    const toplamGelir = trend.reduce((s, t) => s + (t.revenue ?? 0), 0);
+    const toplamKar = trend.reduce((s, t) => s + (t.profit ?? 0), 0);
+    const toplamSiparis = trend.reduce((s, t) => s + (t.orders ?? 0), 0);
+    const marj = toplamGelir > 0 ? Math.round(toplamKar / toplamGelir * 1000) / 10 : 0;
+    const zirveGun = fmtDate(trend[zirve].date).split(" ")[0];
+
     return `
-        <svg viewBox="0 0 ${W} ${H}" class="trend-chart" preserveAspectRatio="none" role="img" aria-label="Günlük gelir ve kâr trendi">
+        <svg viewBox="0 0 ${W} ${H}" class="trend-chart" role="img" aria-label="Günlük gelir ve kâr trendi">
+            ${grid}
             <polygon points="${areaPts}" class="trend-area"></polygon>
             <polyline points="${revPts}" class="trend-line-rev" fill="none"></polyline>
             <polyline points="${profPts}" class="trend-line-prof" fill="none"></polyline>
             ${dots}
+            ${pointLabels}
             ${xLabels}
         </svg>
         <div class="chart-legend">
             <span><i class="lg-rev"></i> Gelir</span>
             <span><i class="lg-prof"></i> Kâr</span>
+        </div>
+        <div class="trend-summary">
+            <span><b>${n}</b> gün</span>
+            <span>Toplam gelir <b>${money(toplamGelir)}</b></span>
+            <span>Toplam kâr <b class="${toplamKar >= 0 ? "profit-pos" : "profit-neg"}">${money(toplamKar)}</b> (marj %${marj})</span>
+            <span>Günlük ort. <b>${money(Math.round(toplamGelir / n))}</b></span>
+            <span><b>${sayi(toplamSiparis)}</b> sipariş</span>
+            <span>Zirve: <b>${esc(zirveGun)}</b> — ${money(trend[zirve].revenue)}</span>
         </div>`;
 }
 
@@ -1447,7 +1792,8 @@ function donutChart(items, fmt) {
 function columnChart(items, fmt) {
     const data = items || [];
     if (data.length === 0) return "<p class='empty'>Veri yok.</p>";
-    const W = Math.max(320, data.length * 60), H = 200, padB = 34, padT = 12, padL = 10, padR = 10;
+    // padT büyük: sütunların TEPESİNE yazılan değer etiketleri için yer bırakır.
+    const W = Math.max(320, data.length * 60), H = 200, padB = 34, padT = 34, padL = 10, padR = 10;
     const max = Math.max(...data.flatMap(d => [d.revenue, d.profit]), 1);
     const bw = (W - padL - padR) / data.length;
     const y = (v) => padT + (1 - v / max) * (H - padT - padB);
@@ -1456,11 +1802,19 @@ function columnChart(items, fmt) {
     const cols = data.map((d, i) => {
         const x = padL + i * bw;
         const w = bw * 0.30;
+        const revX = x + bw * 0.16 + w / 2;
+        const profX = x + bw * 0.52 + w / 2;
+        // Değerler sütunun üstüne DİK (90° döndürülmüş) yazılır: 12 ayın rakamları yan yana
+        // yatay yazıldığında birbirine giriyordu, dik yazınca sütun genişliği kadar yer yeter.
         return `
             <rect x="${(x + bw * 0.16).toFixed(1)}" y="${y(d.revenue).toFixed(1)}" width="${w.toFixed(1)}" height="${(base - y(d.revenue)).toFixed(1)}" class="col-rev" rx="2">
                 <title>${esc(d.label)} • Ciro ${fmt(d.revenue)}</title></rect>
             <rect x="${(x + bw * 0.52).toFixed(1)}" y="${y(d.profit).toFixed(1)}" width="${w.toFixed(1)}" height="${(base - y(d.profit)).toFixed(1)}" class="col-prof" rx="2">
                 <title>${esc(d.label)} • Kâr ${fmt(d.profit)}</title></rect>
+            <text x="${revX.toFixed(1)}" y="${(y(d.revenue) - 4).toFixed(1)}" class="col-vlabel rev"
+                  text-anchor="start" transform="rotate(-90 ${revX.toFixed(1)} ${(y(d.revenue) - 4).toFixed(1)})">${esc(kisaPara(d.revenue))}</text>
+            <text x="${profX.toFixed(1)}" y="${(y(d.profit) - 4).toFixed(1)}" class="col-vlabel prof"
+                  text-anchor="start" transform="rotate(-90 ${profX.toFixed(1)} ${(y(d.profit) - 4).toFixed(1)})">${esc(kisaPara(d.profit))}</text>
             <text x="${(x + bw / 2).toFixed(1)}" y="${H - padB + 15}" class="col-xlabel" text-anchor="middle">${esc(d.label)}</text>`;
     }).join("");
 
@@ -1469,6 +1823,31 @@ function columnChart(items, fmt) {
             ${cols}
         </svg></div>
         <div class="chart-legend"><span><i class="lg-rev"></i> Ciro</span><span><i class="lg-prof"></i> Kâr</span></div>`;
+}
+
+// Analiz sekmesindeki her tablonun KENDİ arama kutusu olur: üstteki büyük filtre çubuğu
+// tüm raporu yeniden sorgular, buradaki kutu ise yalnızca o tablonun satırlarını istemci
+// tarafında süzer — yani bir tabloda arama yapmak diğer tabloları etkilemez ve sunucuya
+// yeni istek gitmez. Sayaç kaç satırın süzmeden geçtiğini gösterir.
+function analyticsTable(title, headers, rows, placeholder = "🔍 Bu tabloda ara") {
+    if (!rows) return "";
+    const total = (rows.match(/<tr/g) ?? []).length;
+    return `
+        <div class="table-block">
+            <div class="table-block-head">
+                <h3 class="analytics-h">${title}</h3>
+                <div class="table-filter">
+                    <input type="search" class="tf-input" placeholder="${placeholder}"
+                           aria-label="${esc(title)} tablosunda ara">
+                    <span class="tf-count" data-total="${total}">${sayi(total)} satır</span>
+                </div>
+            </div>
+            <table class="admin-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <p class="empty tf-empty" hidden>Aramaya uyan satır yok.</p>
+        </div>`;
 }
 
 async function loadAnalytics() {
@@ -1511,7 +1890,8 @@ async function loadAnalytics() {
             <div class="stat-card"><span>Maliyet</span><strong>${money(r.cost)}</strong></div>
             <div class="stat-card profit"><span>Kâr</span><strong>${money(r.profit)}</strong></div>
         </div>
-        ${rangeSaleRows ? `<table class="admin-table"><thead><tr><th>Ürün</th><th>Satılan</th><th>Ciro</th><th>Kâr</th></tr></thead><tbody>${rangeSaleRows}</tbody></table>`
+        ${rangeSaleRows
+            ? analyticsTable("Aralıktaki Ürün Satışları", ["Ürün", "Satılan", "Ciro", "Kâr"], rangeSaleRows, "🔍 Ürün ara")
             : "<p class='empty'>Bu aralıkta satış yok.</p>"}
     ` : "";
 
@@ -1578,9 +1958,13 @@ async function loadAnalytics() {
         <h3 class="analytics-h">Günlük Gelir & Kâr Trendi</h3>
         <div class="chart-card">${trendChart(a.trend)}</div>
 
-        ${fo ? `<h3 class="analytics-h">Filtreli Siparişler ${a.filteredOrders.length >= 100 ? "(ilk 100)" : `(${a.filteredOrders.length})`}</h3>
-        ${foRows ? `<table class="admin-table"><thead><tr><th>No</th><th>Tarih</th><th>Müşteri</th><th>Şehir</th><th>Ürün</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>${foRows}</tbody></table>`
-            : "<p class='empty'>Seçilen filtrelere uyan sipariş yok.</p>"}` : ""}
+        ${fo ? (foRows
+            ? analyticsTable(
+                `Filtreli Siparişler ${a.filteredOrders.length >= 100 ? "(ilk 100)" : `(${a.filteredOrders.length})`}`,
+                ["No", "Tarih", "Müşteri", "Şehir", "Ürün", "Tutar", "Durum"],
+                foRows, "🔍 Sipariş no / müşteri / şehir / durum")
+            : `<h3 class="analytics-h">Filtreli Siparişler (0)</h3>
+               <p class='empty'>Seçilen filtrelere uyan sipariş yok.</p>`) : ""}
 
         ${rangeHtml}
         <h3 class="analytics-h">Satış & Kâr</h3>
@@ -1645,26 +2029,19 @@ async function loadAnalytics() {
             </div>
         </div>
 
-        ${monthlyRows ? `<h3 class="analytics-h">Aylık Kırılım (son 12 ay)</h3>
-        <table class="admin-table"><thead><tr><th>Ay</th><th>Sipariş</th><th>Ciro</th><th>Kâr</th></tr></thead><tbody>${monthlyRows}</tbody></table>` : ""}
+        ${analyticsTable("Aylık Kırılım (son 12 ay)", ["Ay", "Sipariş", "Ciro", "Kâr"], monthlyRows, "🔍 Ay ara")}
 
-        ${catBreakRows ? `<h3 class="analytics-h">Kategori Kırılımı (adet / ciro / kâr)</h3>
-        <table class="admin-table"><thead><tr><th>Kategori</th><th>Satılan</th><th>Ciro</th><th>Kâr</th></tr></thead><tbody>${catBreakRows}</tbody></table>` : ""}
+        ${analyticsTable("Kategori Kırılımı (adet / ciro / kâr)", ["Kategori", "Satılan", "Ciro", "Kâr"], catBreakRows, "🔍 Kategori ara")}
 
-        ${topRows ? `<h3 class="analytics-h">En Çok Harcayan Müşteriler</h3>
-        <table class="admin-table"><thead><tr><th>Müşteri</th><th>Sipariş</th><th>Toplam Harcama</th></tr></thead><tbody>${topRows}</tbody></table>` : ""}
+        ${analyticsTable("En Çok Harcayan Müşteriler", ["Müşteri", "Sipariş", "Toplam Harcama"], topRows, "🔍 Müşteri ara")}
 
-        ${profitProdRows ? `<h3 class="analytics-h">En Kârlı Ürünler</h3>
-        <table class="admin-table"><thead><tr><th>Ürün</th><th>Satılan</th><th>Ciro</th><th>Kâr</th></tr></thead><tbody>${profitProdRows}</tbody></table>` : ""}
+        ${analyticsTable("En Kârlı Ürünler", ["Ürün", "Satılan", "Ciro", "Kâr"], profitProdRows, "🔍 Ürün ara")}
 
-        ${saleRows ? `<h3 class="analytics-h">Ürün Bazında Satış (kaç satıldı / ciro / kâr)</h3>
-        <table class="admin-table"><thead><tr><th>Ürün</th><th>Satılan</th><th>Ciro</th><th>Kâr</th></tr></thead><tbody>${saleRows}</tbody></table>` : ""}
+        ${analyticsTable("Ürün Bazında Satış (kaç satıldı / ciro / kâr)", ["Ürün", "Satılan", "Ciro", "Kâr"], saleRows, "🔍 Ürün ara")}
 
-        ${couponRows ? `<h3 class="analytics-h">Kupon Kullanımı</h3>
-        <table class="admin-table"><thead><tr><th>Kupon</th><th>Kullanım</th><th>Toplam İndirim</th></tr></thead><tbody>${couponRows}</tbody></table>` : ""}
+        ${analyticsTable("Kupon Kullanımı", ["Kupon", "Kullanım", "Toplam İndirim"], couponRows, "🔍 Kupon kodu ara")}
 
-        ${lowStockRows ? `<h3 class="analytics-h">Düşük Stok Uyarısı (≤5)</h3>
-        <table class="admin-table"><thead><tr><th>Ürün</th><th>Kategori</th><th>Stok</th></tr></thead><tbody>${lowStockRows}</tbody></table>` : ""}
+        ${analyticsTable("Düşük Stok Uyarısı (≤5)", ["Ürün", "Kategori", "Stok"], lowStockRows, "🔍 Ürün / kategori ara")}
     `;
 }
 
@@ -1672,6 +2049,30 @@ async function loadAnalytics() {
 document.getElementById("admin-analytics").addEventListener("click", (e) => {
     const link = e.target.closest(".customer-link");
     if (link) openCustomerModal(Number(link.dataset.userId));
+});
+
+// Tablo başına arama: yalnızca kutunun bulunduğu tablonun satırlarını süzer.
+// Tablolar loadAnalytics her çalıştığında yeniden çizildiği için tek tek dinleyici
+// bağlamak yerine kapsayıcıya delege edilir.
+document.getElementById("admin-analytics").addEventListener("input", (e) => {
+    const input = e.target.closest(".tf-input");
+    if (!input) return;
+
+    const blok = input.closest(".table-block");
+    // Türkçe'de I/ı-İ/i dönüşümü farklı olduğu için yerel ayara duyarlı küçültme
+    const aranan = input.value.trim().toLocaleLowerCase("tr");
+    let gorunen = 0;
+
+    blok.querySelectorAll("tbody tr").forEach(tr => {
+        const uyuyor = !aranan || tr.textContent.toLocaleLowerCase("tr").includes(aranan);
+        tr.style.display = uyuyor ? "" : "none";
+        if (uyuyor) gorunen++;
+    });
+
+    const sayac = blok.querySelector(".tf-count");
+    const toplam = Number(sayac.dataset.total);
+    sayac.textContent = aranan ? `${sayi(gorunen)} / ${sayi(toplam)} satır` : `${sayi(toplam)} satır`;
+    blok.querySelector(".tf-empty").hidden = gorunen > 0;
 });
 
 function readAnalyticsInputs() {
@@ -1955,6 +2356,7 @@ function couponFormDoldur(c) {
     editingCouponId = c.id;
     document.getElementById("c-code").value = c.code;
     document.getElementById("c-type").value = String(c.type);
+    couponDegerKutusunuTazele();
     document.getElementById("c-value").value = c.value;
     couponSeciciAyarla(c.userIds ?? []);
     document.getElementById("c-min").value = c.minOrderTotal ?? "";
@@ -1973,9 +2375,24 @@ function couponFormSifirla() {
     // form.reset() onay kutularını HTML'deki hallerine döndürür; seçici JS ile kurulduğu
     // için hepsini elle temizleyip düğme etiketini tazelemek gerekiyor.
     couponSeciciAyarla([]);
+    couponDegerKutusunuTazele();
     document.querySelector("#coupon-form button[type=submit]").textContent = "Kupon Ekle";
     document.getElementById("coupon-cancel").style.display = "none";
 }
+
+// "Tür" ile "Değer" iki ayrı bilgi (cins + miktar) olduğu için ikisi de gerekli; ama iki
+// kutunun aynı şeyi sorduğu izlenimini vermemesi için değer kutusu türe göre kendini anlatır:
+// yüzdede "İndirim oranı (%)" ve 1-99, tutarda "İndirim tutarı (TL)" ve alt sınır 1.
+function couponDegerKutusunuTazele() {
+    const yuzde = document.getElementById("c-type").value === "0";
+    const kutu = document.getElementById("c-value");
+    kutu.placeholder = yuzde ? "İndirim oranı (%)" : "İndirim tutarı (TL)";
+    kutu.title = yuzde ? "Yüzde indirim: 1-99 arası" : "Tutar indirimi: TL cinsinden";
+    kutu.min = 1;
+    if (yuzde) kutu.max = 99; else kutu.removeAttribute("max");
+}
+document.getElementById("c-type").addEventListener("change", couponDegerKutusunuTazele);
+couponDegerKutusunuTazele();
 
 document.getElementById("coupon-cancel").addEventListener("click", couponFormSifirla);
 
@@ -2052,6 +2469,156 @@ document.getElementById("admin-coupons").addEventListener("click", async (e) => 
         } catch (err) {
             showMessage(err.message, false);
         }
+    }
+});
+
+/* ===== Gizemli Hediye Kutusu =====
+   Ödül müşteriye RASTGELE dağıtılır, ama rastgeleliğin kuralları burada yönetilir:
+   havuzdaki ödüller, her birinin çıkma ağırlığı ve oyunun genel ayarları. Kazananı her
+   zaman sunucu seçer; bu ekran yalnızca "hangi ödüller, hangi ihtimalle" sorusunu ayarlar. */
+
+let mbPrizes = [];
+
+async function loadMysteryBoxAdmin() {
+    let data;
+    try {
+        data = await apiGet("/mysterybox/admin");
+    } catch {
+        document.getElementById("mb-prizes").innerHTML = "<p class='empty'>Hediye kutusu ayarları yüklenemedi.</p>";
+        return;
+    }
+
+    document.getElementById("mb-active").checked = !!data.isActive;
+    document.getElementById("mb-cooldown").value = data.cooldownHours;
+    document.getElementById("mb-validdays").value = data.couponValidDays;
+    document.getElementById("mb-boxcount").value = data.boxCount;
+    document.getElementById("mb-stats").textContent =
+        `Bugüne kadar ${sayi(data.totalPlays)} kutu açıldı`;
+
+    mbPrizes = data.prizes ?? [];
+    renderMysteryPrizes();
+}
+
+function renderMysteryPrizes() {
+    const kutu = document.getElementById("mb-prizes");
+    if (!mbPrizes.length) {
+        kutu.innerHTML = "<p class='empty'>Havuzda ödül yok. Aşağıdan ekleyebilirsin (havuz boşken oyun kapalı kalır).</p>";
+        return;
+    }
+
+    const rows = mbPrizes.map(p => `
+        <tr class="${p.isActive ? "" : "row-inactive"}">
+            <td><input type="text" class="mb-r-emoji" value="${esc(p.emoji)}" maxlength="4" style="width:52px"></td>
+            <td><input type="text" class="mb-r-label" value="${esc(p.label)}" style="width:150px"></td>
+            <td>
+                <select class="mb-r-type">
+                    <option value="0" ${p.type === 0 ? "selected" : ""}>%</option>
+                    <option value="1" ${p.type === 1 ? "selected" : ""}>TL</option>
+                </select>
+            </td>
+            <td><input type="number" class="mb-r-value" value="${p.value}" step="0.01" min="1" style="width:70px"></td>
+            <td><input type="number" class="mb-r-min" value="${p.minOrderTotal ?? ""}" step="0.01" min="0" placeholder="—" style="width:80px"></td>
+            <td><input type="number" class="mb-r-weight" value="${p.weight}" min="0" max="1000" style="width:64px"></td>
+            <td><strong>%${p.chance}</strong></td>
+            <td>${sayi(p.wonCount)}</td>
+            <td><input type="checkbox" class="mb-r-active" ${p.isActive ? "checked" : ""} title="Havuzda aktif"></td>
+            <td>
+                <button class="btn-stock mb-save" data-id="${p.id}" title="Kaydet">✓</button>
+                <button class="btn-delete mb-del" data-id="${p.id}" title="Havuzdan sil">🗑</button>
+            </td>
+        </tr>`).join("");
+
+    kutu.innerHTML = `<table class="admin-table">
+        <thead><tr>
+            <th>Emoji</th><th>Ödül adı</th><th>Tür</th><th>Değer</th><th>Min. sepet</th>
+            <th>Ağırlık</th><th>Çıkma ihtimali</th><th>Kazanılma</th><th>Aktif</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody></table>`;
+}
+
+// Satırdaki kutulardan DTO üret (hem kaydet hem doğrulama tek yerde)
+function mbSatirDto(row, id) {
+    const min = row.querySelector(".mb-r-min").value;
+    return {
+        id,
+        emoji: row.querySelector(".mb-r-emoji").value.trim(),
+        label: row.querySelector(".mb-r-label").value.trim(),
+        type: Number(row.querySelector(".mb-r-type").value),
+        value: Number(row.querySelector(".mb-r-value").value),
+        minOrderTotal: min === "" ? null : Number(min),
+        weight: Number(row.querySelector(".mb-r-weight").value),
+        isActive: row.querySelector(".mb-r-active").checked
+    };
+}
+
+document.getElementById("mb-save-settings").addEventListener("click", async () => {
+    try {
+        const r = await apiPut("/mysterybox/admin/settings", {
+            isActive: document.getElementById("mb-active").checked,
+            cooldownHours: Number(document.getElementById("mb-cooldown").value),
+            couponValidDays: Number(document.getElementById("mb-validdays").value),
+            boxCount: Number(document.getElementById("mb-boxcount").value)
+        });
+        showMessage(r.message);
+        await loadMysteryBoxAdmin();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+document.getElementById("mb-prizes").addEventListener("click", async (e) => {
+    const save = e.target.closest(".mb-save");
+    const del = e.target.closest(".mb-del");
+    if (!save && !del) return;
+
+    try {
+        if (save) {
+            const r = await apiPost("/mysterybox/admin/prizes", mbSatirDto(e.target.closest("tr"), Number(save.dataset.id)));
+            showMessage(r.message);
+        } else {
+            const p = mbPrizes.find(x => x.id === Number(del.dataset.id));
+            if (!confirm(`“${p?.label ?? "Ödül"}” havuzdan silinsin mi?\nDaha önce bu ödülü kazanmış müşterilerin kuponları geçerli kalır.`)) return;
+            const r = await apiDelete(`/mysterybox/admin/prizes/${del.dataset.id}`);
+            showMessage(r.message);
+        }
+        await loadMysteryBoxAdmin();
+    } catch (err) {
+        showMessage(err.message, false);
+    }
+});
+
+// Yeni ödül formundaki değer kutusu da türe göre kendini anlatır (kupon formuyla aynı mantık)
+function mbDegerKutusunuTazele() {
+    const yuzde = document.getElementById("mb-type").value === "0";
+    const kutu = document.getElementById("mb-value");
+    kutu.placeholder = yuzde ? "İndirim oranı (%)" : "İndirim tutarı (TL)";
+    kutu.min = 1;
+    if (yuzde) kutu.max = 99; else kutu.removeAttribute("max");
+}
+document.getElementById("mb-type").addEventListener("change", mbDegerKutusunuTazele);
+mbDegerKutusunuTazele();
+
+document.getElementById("mb-prize-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const min = document.getElementById("mb-min").value;
+    try {
+        const r = await apiPost("/mysterybox/admin/prizes", {
+            emoji: document.getElementById("mb-emoji").value.trim() || "🎁",
+            label: document.getElementById("mb-label").value.trim(),
+            type: Number(document.getElementById("mb-type").value),
+            value: Number(document.getElementById("mb-value").value),
+            minOrderTotal: min === "" ? null : Number(min),
+            weight: Number(document.getElementById("mb-weight").value),
+            isActive: true
+        });
+        showMessage(r.message);
+        e.target.reset();
+        document.getElementById("mb-emoji").value = "🎁";
+        document.getElementById("mb-weight").value = 10;
+        mbDegerKutusunuTazele();
+        await loadMysteryBoxAdmin();
+    } catch (err) {
+        showMessage(err.message, false);
     }
 });
 

@@ -152,6 +152,8 @@ public class ProductsController : ControllerBase
         [FromQuery] string? sort,
         [FromQuery] bool discountOnly = false,
         [FromQuery] bool inStockOnly = false,
+        [FromQuery] bool newOnly = false,
+        [FromQuery] bool reviewedOnly = false,
         [FromQuery] double? minRating = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
@@ -248,6 +250,21 @@ public class ProductsController : ControllerBase
                         && oi.Order.Status == OrderStatus.Pending)
                     .Sum(oi => oi.Quantity)
                 > 0);
+        }
+
+        // "Sadece yeni gelenler": son 7 günde kataloğa eklenen ürünler. new-arrivals hızlı
+        // butonuyla aynı eşik, ama burada bir FİLTRE olarak — kategori/fiyat gibi diğer
+        // filtrelerle ve istenen herhangi bir sıralamayla birlikte kullanılabilir.
+        if (newOnly)
+        {
+            query = query.Where(p => p.CreatedAt >= now.AddDays(-7));
+        }
+
+        // "Sadece değerlendirilenler": en az bir yorumu olan ürünler. minRating'ten farkı,
+        // bir puan eşiği dayatmaması — "hakkında yorum var mı" sorusudur, "kaç yıldız" değil.
+        if (reviewedOnly)
+        {
+            query = query.Where(p => p.Reviews.Any());
         }
 
         // "En az X yıldız": yalnızca ortalama puanı eşiğe ulaşan ürünler. Hiç yorumu olmayan
@@ -755,9 +772,14 @@ public async Task<IActionResult> Activate(int id)
 
 // Hard delete yerine soft delete: geçmiş siparişlerin satırları korunur,
 // ürün listeden kalkar, istenirse tekrar aktifleştirilebilir.
+// Stokta mal varken pasifleştirmek, sayılan malı kayıtta yok göstermek demektir; bu yüzden
+// kural kalktı değil, ONAYA bağlandı: istek force=true ile gelmezse uyarıyla reddedilir.
+// (Panel bu cevabı görünce admine "stokta X adet var, yine de kaldırılsın mı?" diye sorar.)
+// Böylece yanlışlıkla kapatma korunurken, sezon sonu gibi durumlarda stoklu ürün de
+// tek adımda satıştan çekilebilir — stok bilgisi silinmez, ürün yalnızca listelerden düşer.
 [HttpDelete("{id}")]
 [Authorize(Roles = "Admin")]
-public async Task<IActionResult> Delete(int id)
+public async Task<IActionResult> Delete(int id, [FromQuery] bool force = false)
 {
     var product = await _context.Products.FindAsync(id);
     if (product == null)
@@ -765,15 +787,21 @@ public async Task<IActionResult> Delete(int id)
         return NotFound();
     }
 
-    // Stokta ürün varken pasifleştirmek, sayılan malı kayıtta yok göstermek demek.
-    // Önce stok sıfırlanmalı (satılmalı ya da elle 0'a çekilmeli), sonra ürün kapatılabilir.
-    if (product.Stock > 0)
+    if (product.Stock > 0 && !force)
     {
-        return BadRequest(new { message = $"Stokta {product.Stock} adet var; stoğu olan ürün pasifleştirilemez. Önce stoğu 0 yapmalısın." });
+        return BadRequest(new
+        {
+            message = $"Stokta {product.Stock} adet var; yine de pasifleştirmek için onay gerekiyor.",
+            requiresConfirmation = true,
+            stock = product.Stock
+        });
     }
 
     product.IsActive = false;
-    UrunLogla("Ürün pasife alındı", $"“{product.Name}” (#{product.Id}) ürünü satıştan kaldırıldı (pasife alındı).");
+    UrunLogla("Ürün pasife alındı",
+        product.Stock > 0
+            ? $"“{product.Name}” (#{product.Id}) ürünü stokta {product.Stock} adet varken satıştan kaldırıldı (onaylı pasifleştirme)."
+            : $"“{product.Name}” (#{product.Id}) ürünü satıştan kaldırıldı (pasife alındı).");
     await _context.SaveChangesAsync();
     return NoContent();
 }

@@ -34,7 +34,9 @@
                     <button class="tab-btn active" data-tab="orders">📦 Siparişler <span id="pending-badge" class="tab-badge" style="display:none"></span></button>
                     <button class="tab-btn" data-tab="products">🛍️ Ürünler</button>
                     <button class="tab-btn" data-tab="discounts">🏷️ İndirimler</button>
+                    <button class="tab-btn" data-tab="weekly">⭐ Haftanın Fırsatı</button>
                     <button class="tab-btn" data-tab="coupons">🎟️ Kuponlar</button>
+                    <button class="tab-btn" data-tab="mystery">🎁 Hediye Kutusu</button>
                     <button class="tab-btn" data-tab="categories">📂 Kategoriler</button>
                     <button class="tab-btn" data-tab="users">👥 Kullanıcılar</button>
                     <button class="tab-btn" data-tab="logs">📜 Loglar</button>
@@ -131,14 +133,56 @@
                 <div id="admin-discounts"></div>
             </section>
 
+            <section id="tab-weekly" class="tab-panel">
+                <h3 class="analytics-h">Bölüm Ayarları</h3>
+                <p class="tab-hint">Vitrindeki başlık, kampanyanın başlayacağı ve biteceği tarih, bölümün açık olup olmadığı. Tarihler değişince seçili tüm ürünlerin indirim aralığı da bunlara güncellenir: <strong>başlangıç gelmeden indirim uygulanmaz ve bölüm görünmez</strong>, sayaç bitince indirimler kendiliğinden kalkar. Başlangıcı boş bırakırsan kampanya hemen geçerlidir.</p>
+                <div class="admin-form" id="wd-settings-bar">
+                    <input type="text" id="wd-title" placeholder="Bölüm başlığı (örn. Haftanın Fırsatı)">
+                    <label class="wd-date"><span>Başlangıç</span><input type="datetime-local" id="wd-starts" title="Kampanyanın başlayacağı an (boş = hemen)"></label>
+                    <label class="wd-date"><span>Bitiş</span><input type="datetime-local" id="wd-ends" title="Geri sayım bitişi"></label>
+                    <label class="bulk-count"><input type="checkbox" id="wd-active"> Bölüm aktif</label>
+                    <button type="button" id="wd-save-settings" class="add-btn">Ayarları Kaydet</button>
+                </div>
+
+                <h3 class="analytics-h">Vitrindeki Ürünler</h3>
+                <p class="tab-hint">Sıra numarasını değiştirip ⇅ ile kaydet, oranı değiştirip ✓ ile kaydet, 🗑 ile vitrinden çıkar (indirimi de kalkar).</p>
+                <div id="wd-current"></div>
+
+                <h3 class="analytics-h">Ürün Ekle</h3>
+                <p class="tab-hint">Filtrele, satırları işaretleyip tek oranla <strong>toplu ekle</strong> ya da tek tek <strong>Ekle</strong>. Zaten indirimli ürünlerin güncel fiyatı listede görünür.</p>
+                <div class="admin-form column-filter" id="wd-filter-bar">
+                    <input type="text" id="wd-f-name" placeholder="🔍 Ürün adı">
+                    <input type="number" id="wd-f-min-price" placeholder="Min fiyat" min="0" step="0.01">
+                    <input type="number" id="wd-f-max-price" placeholder="Max fiyat" min="0" step="0.01">
+                    <select id="wd-f-category"><option value="">Tüm kategoriler</option></select>
+                    <button type="button" id="wd-f-clear" class="btn-cancel">Filtreyi Temizle</button>
+                </div>
+                <div class="admin-form" id="wd-bulk-bar">
+                    <label class="bulk-count"><input type="checkbox" id="wd-select-all"> Görünenleri seç</label>
+                    <!-- "Görünenleri seç" yalnızca filtreyle listelenen satırları işaretler.
+                         Tümünü Seç ise filtreyi yok sayıp vitrinde olmayan BÜTÜN aktif ürünleri
+                         seçer — tek tek işaretlemek yorucu olduğunda tek tıkla hepsi. -->
+                    <button type="button" id="wd-select-every" class="btn-cancel">✔ Tümünü Seç</button>
+                    <button type="button" id="wd-select-none" class="btn-cancel">Seçimi Temizle</button>
+                    <span id="wd-select-count" class="bulk-count muted">0 ürün seçili</span>
+                    <input type="number" id="wd-bulk-pct" placeholder="İndirim %" min="1" max="99" value="20">
+                    <button type="button" id="wd-bulk-add" class="add-btn">Seçilenleri Ekle</button>
+                </div>
+                <div id="wd-picker"></div>
+            </section>
+
             <section id="tab-coupons" class="tab-panel">
                 <form id="coupon-form" class="admin-form coupon-form">
                     <input type="text" id="c-code" placeholder="Kod (örn. YAZ10)" required>
-                    <select id="c-type">
+                    <!-- Tür ile değer AYNI şeyi söylemez, birbirini tamamlar: tür indirimin
+                         cinsini (yüzde mi, TL mi), değer ise miktarını belirler. Karışmasın
+                         diye tek bir alan gibi davranırlar: tür değişince değer kutusunun
+                         etiketi ve sınırları (%1-99 / en az 1 TL) da değişir. -->
+                    <select id="c-type" title="İndirimin cinsi">
                         <option value="0">% Yüzde</option>
                         <option value="1">TL Tutar</option>
                     </select>
-                    <input type="number" id="c-value" placeholder="Değer" step="0.01" min="0" required>
+                    <input type="number" id="c-value" placeholder="İndirim oranı (%)" step="0.01" min="1" max="99" required>
                     <!-- Çoklu seçim: hiç kimse seçilmezse kupon herkese açıktır -->
                     <div id="c-users" class="user-picker" title="Kupon kimlere tanımlansın?">
                         <button type="button" id="c-users-toggle" class="user-picker-toggle"
@@ -155,6 +199,39 @@
                 </form>
                 <p class="tab-hint">Boş bırakılan limit/tarih alanları "sınırsız" demektir. Kupon silinmez, <strong>kapatılır</strong> — geçmiş siparişlerin kaydı korunur. Müşteri seçilirse kuponu <strong>yalnızca seçilen müşteriler</strong> görür ve kullanabilir; hiç seçilmezse herkese açıktır.</p>
                 <div id="admin-coupons"></div>
+            </section>
+
+            <!-- Gizemli hediye kutusu: ödüller RASTGELE dağıtılır ama havuzu ve çıkma
+                 ihtimallerini buradan yönetirsin. Kazanan ödül her zaman sunucuda seçilir. -->
+            <section id="tab-mystery" class="tab-panel">
+                <h3 class="analytics-h">Oyun Ayarları</h3>
+                <p class="tab-hint">Müşteri günde bir kez kutu açar; hangi ödülü kazandığına <strong>sunucu</strong> karar verir ve ödül gerçek bir kupona dönüşür. Buradan oyunu açıp kapatabilir, bekleme süresini, kuponun kaç gün geçerli olacağını ve ekranda kaç kutu görüneceğini ayarlayabilirsin.</p>
+                <div class="admin-form" id="mb-settings-bar">
+                    <label class="bulk-count"><input type="checkbox" id="mb-active"> Oyun açık</label>
+                    <label class="wd-date"><span>Bekleme (saat)</span><input type="number" id="mb-cooldown" min="1" max="720" value="24"></label>
+                    <label class="wd-date"><span>Kupon geçerliliği (gün)</span><input type="number" id="mb-validdays" min="1" max="365" value="7"></label>
+                    <label class="wd-date"><span>Kutu sayısı</span><input type="number" id="mb-boxcount" min="1" max="6" value="3"></label>
+                    <button type="button" id="mb-save-settings" class="add-btn">Ayarları Kaydet</button>
+                    <span id="mb-stats" class="bulk-count muted"></span>
+                </div>
+
+                <h3 class="analytics-h">Ödül Havuzu</h3>
+                <p class="tab-hint">Bir ödülün çıkma ihtimali, <strong>ağırlığının</strong> aktif ödüllerin ağırlık toplamına oranıdır (yandaki % sütunu bunu hesaplar). Ağırlığı büyüt → daha sık çıkar; 0 yap ya da kapat → hiç çıkmaz. Kapatılan/silinen ödül, daha önce kazanılmış kuponları etkilemez.</p>
+                <div id="mb-prizes"></div>
+
+                <h3 class="analytics-h">Yeni Ödül Ekle</h3>
+                <form id="mb-prize-form" class="admin-form">
+                    <input type="text" id="mb-emoji" placeholder="Emoji" value="🎁" maxlength="4" style="width:70px">
+                    <input type="text" id="mb-label" placeholder="Ödül adı (örn. %20 İndirim)" required>
+                    <select id="mb-type" title="İndirimin cinsi">
+                        <option value="0">% Yüzde</option>
+                        <option value="1">TL Tutar</option>
+                    </select>
+                    <input type="number" id="mb-value" placeholder="İndirim oranı (%)" step="0.01" min="1" max="99" required>
+                    <input type="number" id="mb-min" placeholder="Min. sepet (TL)" step="0.01" min="0">
+                    <input type="number" id="mb-weight" placeholder="Ağırlık" min="0" max="1000" value="10" title="Çıkma ağırlığı: büyükse daha sık çıkar">
+                    <button type="submit" class="add-btn">Ödül Ekle</button>
+                </form>
             </section>
 
             <section id="tab-categories" class="tab-panel">

@@ -37,4 +37,12 @@ public class MysteryBoxStatusDto
     public bool CanOpen { get; set; }
     public DateTime? NextAvailableAt { get; set; }
     public MysteryPrizeDto? LastPrize { get; set; }     // bugün kazanılmışsa o ödül
+
+    // Oyunun kendisi admin tarafından kapatılmış mı? Bu durumda "yarın gel" değil
+    // "şu an kapalı" ekranı gösterilir (NextAvailableAt de boş gelir).
+    public bool GameClosed { get; set; }
+
+    // Ekranda kaç kutu çizilecek. Admin ayarlayabilir; havuzdaki aktif ödül sayısından
+    // fazla olamaz, o yüzden karar sunucuda verilir.
+    public int BoxCount { get; set; } = 3;
 }

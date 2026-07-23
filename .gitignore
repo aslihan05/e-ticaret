@@ -2,6 +2,7 @@
 bin/
 obj/
 publish/
+yayin/
 *.user
 
 # Visual Studio / VS Code
@@ -24,3 +25,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Kisisel notlar (repoya girmez)
+SUNUM-REHBERI.md

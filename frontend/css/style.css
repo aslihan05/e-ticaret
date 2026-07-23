@@ -14,6 +14,10 @@ body {
     background-attachment: fixed;
     min-height: 100vh;
     color: #1f2937;
+    /* Footer artık ekrana sabit (position:fixed); kaydırma sırasında hep en altta durur.
+       Akıştan çıktığı için son içeriğin footer'ın ARDINA gizlenmemesi için gövdenin altına
+       footer yüksekliği kadar boşluk bırakılır. */
+    padding-bottom: 48px;
 }
 
 /* ===== Üst bar ===== */
@@ -179,6 +183,173 @@ header h1 a {
 @media (prefers-reduced-motion: reduce) {
     .banner { animation: none; }
     .banner::after { animation: none; display: none; }
+}
+
+/* ===== Vitrin satırı: banner (sol) + Haftanın Fırsatı (sağ) ===== */
+
+/* Flex kullanılır (grid değil): banner'ın taban .banner kuralındaki grid-column/row
+   değerleri flex kapsayıcıda yok sayılır, böylece ayrı bir sıfırlama gerekmez. */
+.showcase {
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+    min-width: 0;
+}
+.showcase .banner {
+    flex: 1.4 1 0;
+    min-width: 0;
+    margin: 0;   /* banner'ın taban margin'ini sıfırla; hizayı showcase yönetir */
+}
+.showcase .weekly-deal { flex: 1 1 0; min-width: 0; }
+/* Haftanın Fırsatı boş/pasifse banner tek başına satırı doldurur */
+.showcase.no-deal .banner { flex: 1 1 100%; }
+
+/* ===== Haftanın Fırsatı paneli (renkli, hareketli) ===== */
+.weekly-deal {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    padding: 20px 20px 22px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background:
+        radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.30), transparent 45%),
+        linear-gradient(125deg, #7c3aed 0%, #db2777 40%, #f59e0b 75%, #22d3ee 100%);
+    background-size: 260% 260%;
+    animation: wdFlow 10s ease infinite;
+    box-shadow: 0 16px 38px rgba(219, 39, 119, 0.32);
+}
+@keyframes wdFlow {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+/* Panelde dönen ışık lekesi */
+.weekly-deal::before {
+    content: "";
+    position: absolute;
+    top: -40%; right: -25%;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 70%);
+    animation: wdPulse 6s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes wdPulse {
+    0%, 100% { transform: scale(1);   opacity: 0.6; }
+    50%      { transform: scale(1.25); opacity: 1; }
+}
+
+.wd-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.wd-title { display: flex; align-items: center; gap: 8px; }
+.wd-title h2 {
+    font-size: 1.35rem;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    line-height: 1.1;
+}
+.wd-spark {
+    font-size: 1.5rem;
+    display: inline-block;
+    animation: wdSpark 1.8s ease-in-out infinite;
+}
+@keyframes wdSpark {
+    0%, 100% { transform: rotate(-12deg) scale(1); }
+    50%      { transform: rotate(12deg) scale(1.2); }
+}
+
+/* Geri sayım rozeti */
+.wd-countdown {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    background: rgba(30, 27, 75, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    padding: 6px 14px;
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
+}
+.wd-cd-label { font-size: 0.72rem; opacity: 0.9; }
+.wd-cd-days { font-size: 0.9rem; }
+.wd-cd-days b { font-size: 1.15rem; font-weight: 800; }
+.wd-cd-clock {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+
+/* Slider */
+.wd-slider {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.wd-track {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 4px 2px 8px;
+    scrollbar-width: none;   /* Firefox: ince/gizli */
+    flex: 1;
+    min-width: 0;
+    /* Kaydırma tek kart ilerlediği için şerit her zaman bir kartın başında durur;
+       snap olmadan parmakla/tekerlekle kaydırınca kartlar yarım kalırdı. */
+    scroll-snap-type: x mandatory;
+}
+.wd-track::-webkit-scrollbar { height: 0; }
+
+/* Vitrindeki kartlar sezon indirimi şeridiyle aynı bileşen (.sale-card); burada
+   şeridin TAM genişliğini kaplarlar — aynı anda yalnızca bir ürün görünür, sonraki
+   kart 14px'lik boşluğun ardında tamamen görüş alanının dışında kalır. */
+.wd-track .sale-card {
+    flex: 0 0 100%;
+    min-width: 100%;
+    max-width: 100%;
+    scroll-snap-align: start;
+    box-shadow: 0 8px 20px rgba(30, 27, 75, 0.18);
+}
+.wd-track .sale-card:hover { box-shadow: 0 14px 28px rgba(30, 27, 75, 0.28); }
+/* Kart genişleyince görsel de büyür; yoksa geniş kartın içinde bant gibi kalırdı */
+.wd-track .sale-card img,
+.wd-track .sale-card .img-placeholder { height: 210px; }
+.wd-track .sale-card h4 { font-size: 1.05rem; margin: 12px 0 6px; }
+.wd-track .sale-card .price-new { font-size: 1.15rem; }
+
+.wd-nav {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1e1b4b;
+    font-size: 1.2rem;
+    line-height: 1;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s, background 0.15s;
+}
+.wd-nav:hover { transform: scale(1.12); background: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+    .weekly-deal { animation: none; }
+    .weekly-deal::before,
+    .wd-spark { animation: none; }
 }
 
 /* ===== Kenar çubuğu ===== */
@@ -503,12 +674,17 @@ aside h2 {
 /* ===== Alt şerit ===== */
 
 footer {
+    /* Ekranın en dibine yapışık ve sabit: sayfa kaydırılsa da hareket etmeden orada kalır. */
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9000;   /* içeriğin üstünde; canlı destek butonundan (9998) düşük kalır */
     background: #1e1b4b;
     color: rgb(255, 232, 162);
     text-align: center;
     padding: 14px;
     font-size: 0.85rem;
-    margin-top: 24px;
 }
 
 /* ===== Sipariş geçmişi ===== */
@@ -845,12 +1021,35 @@ footer {
 .bar-value { font-size: 0.82rem; font-weight: 700; color: #1e293b; white-space: nowrap; }
 
 /* Trend çizgi grafiği */
-.trend-chart { width: 100%; height: 240px; display: block; }
+/* Grafik artık yazı içeriyor: en-boy oranı korunarak ölçeklenir (eskiden yatayda esnetiliyordu,
+   bu da rakamları ve tarihleri eğip bozardı). Yükseklik viewBox oranından türetilir. */
+.trend-chart { width: 100%; height: auto; aspect-ratio: 760 / 240; display: block; }
 .trend-area { fill: rgba(99, 102, 241, 0.12); }
 .trend-line-rev { stroke: #6366f1; stroke-width: 2; }
 .trend-line-prof { stroke: #22c55e; stroke-width: 2; stroke-dasharray: 5 4; }
 .trend-dot { fill: #6366f1; }
 .trend-xlabel { fill: #94a3b8; font-size: 11px; }
+
+/* Trend grafiğinin veri katmanı: ölçek çizgileri, eksen değerleri ve nokta etiketleri.
+   Etiket renkleri kendi çizgileriyle eşleşir (mor = gelir, yeşil = kâr). */
+.trend-grid { stroke: #e2e8f0; stroke-width: 1; }
+.trend-ylabel { fill: #94a3b8; font-size: 10px; }
+.trend-dot-prof { fill: #fff; stroke: #22c55e; stroke-width: 1.5; }
+.trend-vlabel { font-size: 10px; font-weight: 600; }
+.trend-vlabel.rev { fill: #6366f1; }
+.trend-vlabel.prof { fill: #22c55e; }
+
+/* Grafiğin altındaki özet şeridi: toplam / ortalama / zirve gibi ilk sorulan rakamlar */
+.trend-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    justify-content: center;
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: #475569;
+}
+.trend-summary b { color: #0f172a; }
 .chart-legend { display: flex; gap: 18px; justify-content: center; margin-top: 6px; font-size: 0.82rem; color: #475569; }
 .chart-legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
 .chart-legend .lg-rev { background: #6366f1; }
@@ -875,6 +1074,16 @@ footer {
 .column-chart .col-prof { fill: #22c55e; }
 .column-chart .col-axis { stroke: #e2e8f0; stroke-width: 1; }
 .column-chart .col-xlabel { fill: #94a3b8; font-size: 10px; }
+
+/* Sütunların tepesindeki değer etiketleri (dik yazılır; renkleri kendi çubuklarıyla eşleşir,
+   böylece hangi rakamın ciroya hangisinin kâra ait olduğu efsaneye bakmadan anlaşılır). */
+.column-chart .col-vlabel { font-size: 9px; font-weight: 600; }
+.column-chart .col-vlabel.rev { fill: #6366f1; }
+.column-chart .col-vlabel.prof { fill: #22c55e; }
+
+/* Admin formlarındaki tarih/sayı kutularının üstündeki küçük etiket */
+.admin-form .wd-date { display: inline-flex; flex-direction: column; gap: 2px; font-size: 11px; color: #64748b; }
+.admin-form .wd-date input { margin: 0; }
 
 /* ===== İl / İlçe accordion (Task #6) ===== */
 .region-accordion {
@@ -1437,6 +1646,16 @@ footer {
     border-radius: 6px;
 }
 
+/* Ürün seçicide zaten indirimli ürünleri işaretleyen pembe rozet */
+.badge-discount {
+    background: #fce7f3;
+    color: #be185d;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
 .btn-activate {
     border: none;
     border-radius: 6px;
@@ -1750,13 +1969,14 @@ footer {
 
 /* ===== Yuvarlak hızlı kategori butonları (Trendyol tarzı) ===== */
 
-/* Butonlar Ongima'nın altında, sol kolonda DİKEY dizilir ve sayfa kaydırılsa da
-   sabit (sticky) kalır. */
+/* Butonlar banner'ın üstünde, sayfanın ortasında YATAY dizilir. */
 .quick-cats {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 28px;
     padding: 4px;
 }
 
@@ -1789,15 +2009,8 @@ footer {
 .qc-best { background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.5), transparent 60%), linear-gradient(135deg, #f97316, #ef4444); }
 .qc-fav  { background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.5), transparent 60%), linear-gradient(135deg, #ec4899, #a855f7); }
 .qc-reco { background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.5), transparent 60%), linear-gradient(135deg, #6366f1, #22d3ee); }
-/* "Yeni Gelenler": taze yeşil-lime degrade + dikkat çeken canlı nabız halkası */
-.qc-new  { background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.55), transparent 60%), linear-gradient(135deg, #16a34a, #84cc16); animation: qcNewPulse 2.2s ease-out infinite; }
-
-@keyframes qcNewPulse {
-    0%   { box-shadow: 0 8px 20px rgba(30,27,75,0.16), 0 0 0 0 rgba(132,204,22,0.55); }
-    70%  { box-shadow: 0 8px 20px rgba(30,27,75,0.16), 0 0 0 14px rgba(132,204,22,0); }
-    100% { box-shadow: 0 8px 20px rgba(30,27,75,0.16), 0 0 0 0 rgba(132,204,22,0); }
-}
-@media (prefers-reduced-motion: reduce) { .qc-new { animation: none; } }
+/* "Yeni Gelenler": taze yeşil-lime degrade */
+.qc-new  { background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.55), transparent 60%), linear-gradient(135deg, #16a34a, #84cc16); }
 
 .quick-cat:hover .quick-cat-badge {
     transform: translateY(-4px) scale(1.05);
@@ -1821,28 +2034,66 @@ footer {
 
 .quick-cat.active .quick-cat-label { color: #b45309; }
 
-/* ===== Vitrin yerleşimi: solda sabit hızlı butonlar kolonu, sağda içerik ===== */
+/* ===== Vitrin yerleşimi =====
+   Varsayılan (filtre kapalı): tek kolon. Hızlı butonlar en üstte ortada, altında banner,
+   en altta ürünler — hepsi tam genişlik.
+   Bir kategori seçilince (.filters-open): sol kolon belirir ve filtre paneli oraya oturur;
+   banner ile ürünler sağ kolona geçer, hızlı butonlar iki kolonu birden kaplamaya devam eder. */
 
-.layout-shop { grid-template-columns: 168px 1fr; }
+.layout-shop { grid-template-columns: 1fr; }
 
-/* Sol kolon: hızlı butonlar, iki satırı da kaplar ve header'ın altında sabit durur */
 .layout-shop .quick-cats {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-self: start;
+    margin-bottom: 4px;
+}
+
+/* Banner artık tek başına değil; "showcase" satırının içinde (solda banner, sağda
+   Haftanın Fırsatı). Grid hücresini bu wrapper kaplar. */
+.layout-shop .showcase { grid-column: 1; grid-row: 2; }
+.layout-shop main { grid-column: 1; grid-row: 3; }
+
+/* Filtre paneli varsayılan olarak yok; yalnızca .filters-open sınıfıyla belirir. */
+.layout-shop .filter-panel { display: none; }
+
+.layout-shop.filters-open { grid-template-columns: 260px 1fr; }
+.layout-shop.filters-open .filter-panel {
+    display: block;
     grid-column: 1;
-    grid-row: 1 / span 2;
+    grid-row: 2 / span 2;      /* banner + ürünler yüksekliğince sol kolonu kaplar */
     position: sticky;
     top: 96px;
     align-self: start;
-    /* Ongima logosunun altına hizalamak için ortalamak yerine sola yaslıyor,
-       margin-top'u küçülterek biraz yukarı çekiyoruz. Negatif margin-left ile
-       buton öbeğinin merkezini header'daki logonun merkeziyle çakıştırıyoruz
-       (logo kolon dışında, sayfa kenarında başladığı için gerekli). */
-    justify-self: start;
-    margin-top: 8px;
-    margin-left: -30px;
+}
+.layout-shop.filters-open .showcase { grid-column: 2; grid-row: 2; }
+.layout-shop.filters-open main { grid-column: 2; grid-row: 3; }
+
+/* ===== Kategori seçiliyken vitrin öğelerini gizle =====
+   Hızlı butonlar, sezon indirimi banner'ı ve Haftanın Fırsatı yalnızca "ana sayfa"
+   görünümünde (kategori seçili değilken) anlamlıdır. Bir kategori seçilince (JS
+   .category-active ekler) bunlar gizlenir; geriye yalnızca filtre paneli + ürünler kalır.
+   Bu blok filters-open kurallarından SONRA geldiği için eşit özgüllükte grid-row'u ezer. */
+.layout-shop.category-active .quick-cats,
+.layout-shop.category-active .showcase { display: none; }
+/* Ürünler ve filtre paneli en üste otursun (boşalan 1-2. satır boşluk bırakmasın).
+   Yalnızca masaüstü grid'inde gerekli: mobilde (≤768px) satırlar zaten "auto" akışta,
+   orada bu override filtre panelini main'in üstüne itip boşluk yaratırdı. */
+@media (min-width: 769px) {
+    .layout-shop.category-active main { grid-row: 1; }
+    .layout-shop.category-active.filters-open .filter-panel { grid-row: 1; }
 }
 
-.layout-shop .banner { grid-column: 2; grid-row: 1; }
-.layout-shop main { grid-column: 2; grid-row: 2; }
+/* ===== Arama / hızlı buton aktifken yalnızca vitrini gizle =====
+   Kullanıcı arama yaptığında ya da bir hızlı butona bastığında sonuç listesi hemen
+   görünmeli; sezon indirimi banner'ı + Haftanın Fırsatı ürünleri çok aşağı itiyordu.
+   Hızlı butonlar burada GİZLENMEZ (aktif butonu kapatabilmek için gerekli), yalnızca
+   .showcase kalkar ve ürünler bir satır yukarı çıkar. */
+.layout-shop.showcase-hidden .showcase { display: none; }
+@media (min-width: 769px) {
+    .layout-shop.showcase-hidden main { grid-row: 2; }
+    .layout-shop.showcase-hidden.filters-open .filter-panel { grid-row: 2; }
+}
 
 /* Canlı destek butonu (giriş yapılınca sağ altta beliren daire) aktifken, ürün ızgarası
    butonun soluna kadar daraltılır. Sabit (fixed) buton her kaydırmada aynı ekran köşesinde
@@ -1861,13 +2112,14 @@ body.cbot-active .layout-shop { --cbot-reserve: 0px; }
     body.cbot-active .layout-shop { --cbot-reserve: 120px; }
 }
 body.cbot-active .layout-shop main { padding-right: var(--cbot-reserve); }
-body.cbot-active .layout-shop .banner { margin-right: var(--cbot-reserve); }
+body.cbot-active .layout-shop .showcase { margin-right: var(--cbot-reserve); }
 
 /* Dar ekranda tek kolona düşülür: hızlı butonlar üstte yatay dizilir, sabitlenmez.
    Bu blok, yukarıdaki masaüstü temel kurallarından SONRA geldiği için (aynı özgüllük,
    sonraki kazanır) ≤768px'te doğru şekilde onları ezer. */
 @media (max-width: 768px) {
-    .layout-shop { grid-template-columns: 1fr; }
+    .layout-shop,
+    .layout-shop.filters-open { grid-template-columns: 1fr; }
     .layout-shop .quick-cats {
         grid-column: 1;
         grid-row: auto;
@@ -1876,8 +2128,18 @@ body.cbot-active .layout-shop .banner { margin-right: var(--cbot-reserve); }
         flex-wrap: wrap;
         justify-content: center;
     }
-    .layout-shop .banner { grid-column: 1; grid-row: auto; }
-    .layout-shop main { grid-column: 1; grid-row: auto; }
+    .layout-shop .showcase,
+    .layout-shop.filters-open .showcase { grid-column: 1; grid-row: auto; }
+    /* Dar ekranda banner ile Haftanın Fırsatı alt alta düşer */
+    .showcase { flex-direction: column; }
+    .layout-shop main,
+    .layout-shop.filters-open main { grid-column: 1; grid-row: auto; }
+    /* Dar ekranda filtre paneli sabitlenmez; hızlı butonlarla banner arasında blok olarak akar. */
+    .layout-shop.filters-open .filter-panel {
+        grid-column: 1;
+        grid-row: auto;
+        position: static;
+    }
 }
 
 /* ===== Fiyat aralığı filtresi ===== */
@@ -1916,6 +2178,108 @@ body.cbot-active .layout-shop .banner { margin-right: var(--cbot-reserve); }
     font-size: 0.85rem;
     text-decoration: underline;
 }
+
+/* ===== Solda açılan filtre paneli (sade & şık) ===== */
+
+.filter-panel {
+    background: #fff;
+    border: 1px solid #eef0f4;
+    border-radius: 16px;
+    padding: 18px 18px 20px;
+    box-shadow: 0 12px 34px rgba(30, 27, 75, 0.10);
+    color: #1e1b4b;
+    /* Açılırken hafifçe soldan süzülerek belirir */
+    animation: filterPanelIn 0.28s cubic-bezier(.18, .9, .32, 1.15);
+}
+
+@keyframes filterPanelIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .filter-panel { animation: none; }
+}
+
+.filter-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #f1f2f6;
+}
+
+.filter-panel-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+}
+
+.filter-close {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.filter-close:hover { background: #fee2e2; color: #dc2626; }
+
+/* Her filtre öbeği ince bir çizgiyle ayrılır — sade bir ritim verir */
+.filter-group {
+    padding: 14px 0;
+    border-bottom: 1px solid #f5f6fa;
+}
+.filter-group:last-of-type { border-bottom: none; }
+
+.filter-panel .filter-subtitle {
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-size: 0.72rem;
+    color: #9ca3af;
+}
+
+.filter-panel .price-filter { margin-bottom: 12px; }
+.price-sep { color: #cbd0da; font-weight: 600; }
+
+/* Hazır fiyat aralığı çipleri */
+.price-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.price-chip {
+    padding: 7px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.price-chip:hover { border-color: #f59e0b; color: #b45309; }
+.price-chip.active {
+    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.30);
+}
+
+.filter-panel .filter-apply {
+    margin-top: 16px;
+    width: 100%;
+}
+.filter-panel .filter-clear { margin-top: 4px; }
 
 /* ===== Kalem bazlı sipariş kararı ===== */
 
@@ -2238,6 +2602,50 @@ body.cbot-active .layout-shop .banner { margin-right: var(--cbot-reserve); }
 .analytics-h:first-child { margin-top: 0; }
 .stat-card.profit { border-left-color: #059669; }
 .stat-card.profit strong { color: #059669; }
+
+/* ===== Analiz: tablo başına ayrı filtre =====
+   Her tablonun başlığı ile kendi arama kutusu aynı satırda durur; kutu yalnızca o
+   tablonun satırlarını süzer (üstteki büyük filtre çubuğu ise tüm raporu sorgular). */
+.table-block { margin-top: 22px; }
+
+.table-block-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.table-block-head .analytics-h { margin: 0; }
+
+.table-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tf-input {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    width: 260px;
+    max-width: 100%;
+    font-size: 0.85rem;
+    background: #fff;
+}
+.tf-input:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.tf-count {
+    color: #6b7280;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.table-block .tf-empty { margin-top: 10px; }
 
 /* İndirim sekmesi: "Ürün Bazında İndirim" başlığı ile aramayı aynı satırda tut */
 .disc-table-head {
