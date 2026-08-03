@@ -28,7 +28,11 @@ public class OrderService
         _couponService = couponService;
     }
 
-    public async Task<Order> CreateOrderFromCartAsync(int userId, CheckoutDto dto)
+    // Sepetteki HER ÜRÜN kendi siparişini alır: ayrı numara, admin panelinde ayrı satır.
+    // Tek siparişte toplansaydı admin bir ürünü onaylayıp diğerini bekletemezdi — hepsi
+    // tek bir durumu (Bekliyor/Onaylandı) paylaşırdı. Aynı tıklamada doğan siparişler
+    // ortak CheckoutId ile işaretlenir. Dönen liste sepetteki sırayı korur.
+    public async Task<List<Order>> CreateOrderFromCartAsync(int userId, CheckoutDto dto)
     {
         // Teslimat bilgileri olmadan sipariş oluşturulamaz
         if (string.IsNullOrWhiteSpace(dto.RecipientName) ||
@@ -50,18 +54,6 @@ public class OrderService
             throw new Exception("Sepetiniz boş.");
         }
 
-        var order = new Order
-        {
-            UserId = userId,
-            Status = OrderStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            RecipientName = dto.RecipientName.Trim(),
-            Phone = dto.Phone.Trim(),
-            City = dto.City.Trim(),
-            District = dto.District.Trim(),
-            Address = dto.Address.Trim()
-        };
-
         // Sipariş oluşturulurken stok HİÇ doğrulanmıyordu: stokta 1 adet varken 5 adetlik
         // sipariş verilebiliyor, sorun ancak admin onaylamaya çalıştığında ortaya çıkıyordu.
         // Sepetteki kendi rezervasyonu kendine karşı sayılmadığı için (exceptUserId) burada
@@ -78,8 +70,26 @@ public class OrderService
         }
 
         var now = DateTime.UtcNow;
+        var checkoutId = Guid.NewGuid();
+        var orders = new List<Order>();
+
         foreach (var item in cartItems)
         {
+            var order = new Order
+            {
+                UserId = userId,
+                CheckoutId = checkoutId,
+                Status = OrderStatus.Pending,
+                // Aynı tıklamadan doğan siparişler AYNI ana yazılır: listede yan yana
+                // sıralanmaları ve iptal süresinin hepsi için aynı anda başlaması için.
+                CreatedAt = now,
+                RecipientName = dto.RecipientName.Trim(),
+                Phone = dto.Phone.Trim(),
+                City = dto.City.Trim(),
+                District = dto.District.Trim(),
+                Address = dto.Address.Trim()
+            };
+
             order.OrderItems.Add(new OrderItem
             {
                 ProductId = item.ProductId,
@@ -90,30 +100,79 @@ public class OrderService
                 // İndirim aktifse sipariş indirimli fiyattan kesilir
                 UnitPrice = item.Product.EffectivePrice(now)
             });
+
+            orders.Add(order);
         }
 
         // Kupon (varsa) sepetin SUNUCUDA hesaplanan toplamı üzerinden doğrulanır.
         // Tutar frontend'den alınsaydı, isteği elle düzenleyen biri "sepetim 10.000 TL"
-        // deyip alt limitli kuponu hak etmeden geçirebilirdi.
+        // deyip alt limitli kuponu hak etmeden geçirebilirdi. Alt limit de TÜM sepete
+        // bakar — sipariş başına bakılsaydı, sepeti bölmek kuponu geçersiz kılardı.
         if (!string.IsNullOrWhiteSpace(dto.CouponCode))
         {
-            decimal subtotal = order.OrderItems.Sum(i => i.UnitPrice * i.Quantity);
+            decimal subtotal = orders.Sum(o => o.OrderItems.Sum(i => i.UnitPrice * i.Quantity));
             var coupon = await _couponService.ValidateAsync(dto.CouponCode, userId, subtotal);
-            CouponService.Uygula(order, coupon);
+            KuponuSiparislerePaylastir(orders, coupon, subtotal);
         }
 
-        _context.Orders.Add(order);
+        _context.Orders.AddRange(orders);
         _context.CartItems.RemoveRange(cartItems);
 
-        await ProfileAdresiniIlkKezDoldurAsync(userId, order);
+        await ProfileAdresiniIlkKezDoldurAsync(userId, orders[0]);
 
         await _context.SaveChangesAsync();
 
         // "Siparişiniz alındı" maili. SaveChanges'ten SONRA çağrılır: sipariş garanti altında,
         // mail gönderilemese bile (kota, servis kesintisi) sipariş kaydı kaybolmaz.
-        await _emailService.SendOrderStatusAsync(order.Id, OrderStatus.Pending);
+        // Her sipariş ayrı numara taşıdığı için maili de ayrı alır — müşteri hangi numaranın
+        // hangi ürüne ait olduğunu ancak böyle eşleştirebilir.
+        foreach (var order in orders)
+        {
+            await _emailService.SendOrderStatusAsync(order.Id, OrderStatus.Pending);
+        }
 
-        return order;
+        return orders;
+    }
+
+    // Kupon TÜM sepete verilmiştir; sepet birden çok siparişe bölününce indirim de bölünür.
+    // Yoksa aynı kupon her siparişe ayrı ayrı uygulanır ve müşteri hak ettiğinin katı kadar
+    // indirim alırdı (3 ürüne bölünen 50 TL'lik kupon = 150 TL indirim).
+    //
+    // Yüzde kuponu bölünmeye zaten dayanıklıdır: sepetin %10'u ile her parçanın %10'unun
+    // toplamı aynıdır. Tutar kuponu ise siparişlerin ara toplamına ORANLA paylaştırılır;
+    // yuvarlama artığı son siparişe yazılır ki parçaların toplamı kuponun tam değerini versin.
+    //
+    // Alt limit (MinOrderTotal) parçalara KOPYALANMAZ: limit, sepetin tamamı için yukarıda
+    // doğrulandı. Parça siparişe kopyalansaydı, 500 TL'lik sepetin 80 TL'lik parçası "limit
+    // altında" sayılıp indirimini kaybederdi.
+    private static void KuponuSiparislerePaylastir(List<Order> orders, Coupon coupon, decimal subtotal)
+    {
+        foreach (var order in orders)
+        {
+            CouponService.Uygula(order, coupon);
+            order.CouponMinOrderTotal = null;
+        }
+
+        if (coupon.Type != CouponType.Percent && subtotal > 0)
+        {
+            decimal dagitilan = 0;
+            for (int i = 0; i < orders.Count; i++)
+            {
+                decimal payTutari;
+                if (i == orders.Count - 1)
+                {
+                    payTutari = coupon.Value - dagitilan;   // yuvarlama artığı son siparişte
+                }
+                else
+                {
+                    decimal siparisToplami = orders[i].OrderItems.Sum(x => x.UnitPrice * x.Quantity);
+                    payTutari = Math.Round(coupon.Value * siparisToplami / subtotal, 2);
+                    dagitilan += payTutari;
+                }
+
+                orders[i].CouponValue = payTutari;
+            }
+        }
     }
 
     // Müşteri adresini bir kez girsin, sonraki siparişlerde sepet onu hazır getirsin diye
@@ -160,10 +219,13 @@ public class OrderService
     }
 
     // Müşteri kendi siparişini yalnızca (1) henüz onaylanmadıysa ve (2) CancelWindow süresi
-    // dolmadıysa iptal edebilir. Bekleyen siparişte stok henüz düşmediği için stok iadesi gerekmez.
+    // dolmadıysa iptal edebilir. Sipariş "Bekliyor" olsa da kalem bazlı kısmi onayla
+    // bazı kalemler onaylanmış ve stoğu düşmüş olabilir; iptalde o stok geri verilir.
     public async Task CancelOrderAsync(int orderId, int userId)
     {
         var order = await _context.Orders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
 
         if (order == null)
@@ -183,13 +245,24 @@ public class OrderService
             throw new Exception($"İptal süresi doldu. Siparişler yalnızca verildikten sonraki {CancelWindow.TotalHours:0.#} saat içinde iptal edilebilir.");
         }
 
+        // Kısmi onayla stoğu düşmüş kalemler varsa stok iade edilir ve kalem de iptal olur;
+        // aksi hâlde ürün hem satılmış hem iptal edilmiş sayılırdı.
+        foreach (var item in order.OrderItems.Where(i => i.Status == OrderStatus.Approved))
+        {
+            item.Product.Stock += item.Quantity;
+            item.Status = OrderStatus.Cancelled;
+        }
+
         order.Status = OrderStatus.Cancelled;
         await _context.SaveChangesAsync();
     }
 
-    // Kalem bazında karar: approvedItemIds içindekiler onaylanır, kalanlar reddedilir.
-    // Hiç onaylanan yoksa sipariş Rejected, en az bir kalem onaylıysa Approved olur.
-    public async Task DecideOrderAsync(int orderId, List<int> approvedItemIds, int adminUserId)
+    // Kalem bazında karar: approvedItemIds onaylanır, rejectedItemIds reddedilir.
+    // İki listede de olmayan kalemler BEKLEMEDE kalır; sipariş de en az bir kalemi
+    // beklerken Pending kalır. Böylece admin aynı siparişteki bir ürünü onaylayıp
+    // diğerini sonraya bırakabilir (eskiden seçilmeyen kalem doğrudan reddediliyordu).
+    // Tüm kalemler karara bağlandığında: en az bir onay varsa Approved, yoksa Rejected.
+    public async Task DecideOrderAsync(int orderId, List<int> approvedItemIds, int adminUserId, List<int>? rejectedItemIds = null)
     {
         var order = await _context.Orders
             .Include(o => o.OrderItems)
@@ -206,7 +279,16 @@ public class OrderService
             throw new Exception("Bu sipariş zaten işleme alınmış.");
         }
 
-        var approved = order.OrderItems.Where(i => approvedItemIds.Contains(i.Id)).ToList();
+        // Karar yalnızca hâlâ bekleyen kalemler için verilebilir; daha önce
+        // onaylanmış bir kalemin stoğu ikinci kez düşmemeli.
+        var pending = order.OrderItems.Where(i => i.Status == OrderStatus.Pending).ToList();
+        var approved = pending.Where(i => approvedItemIds.Contains(i.Id)).ToList();
+        var rejected = pending.Where(i => rejectedItemIds != null && rejectedItemIds.Contains(i.Id)).ToList();
+
+        if (approved.Count == 0 && rejected.Count == 0)
+        {
+            throw new Exception("Karar verilecek kalem seçilmedi.");
+        }
 
         // Önce onaylanacak kalemlerin stoğu yetiyor mu kontrol et, sonra düş
         foreach (var item in approved)
@@ -217,43 +299,56 @@ public class OrderService
             }
         }
 
-        foreach (var item in order.OrderItems)
+        foreach (var item in approved)
         {
-            if (approved.Contains(item))
-            {
-                item.Status = OrderStatus.Approved;
-                item.Product.Stock -= item.Quantity;
-            }
-            else
-            {
-                item.Status = OrderStatus.Rejected;
-            }
+            item.Status = OrderStatus.Approved;
+            item.Product.Stock -= item.Quantity;
         }
 
-        order.Status = approved.Count > 0 ? OrderStatus.Approved : OrderStatus.Rejected;
-        order.ApprovedAt = DateTime.UtcNow;
-        order.ApprovedBy = adminUserId;
+        foreach (var item in rejected)
+        {
+            item.Status = OrderStatus.Rejected;
+        }
+
+        bool hepsiKararaBaglandi = order.OrderItems.All(i => i.Status != OrderStatus.Pending);
+
+        if (hepsiKararaBaglandi)
+        {
+            bool onaylananVar = order.OrderItems.Any(i => i.Status == OrderStatus.Approved);
+            order.Status = onaylananVar ? OrderStatus.Approved : OrderStatus.Rejected;
+            order.ApprovedAt = DateTime.UtcNow;
+            order.ApprovedBy = adminUserId;
+        }
 
         await _context.SaveChangesAsync();
 
         // Onay/red kararı müşteriyi doğrudan ilgilendirir; mail kalemlerin son hâline göre gider
-        // (kısmi onayda reddedilen kalemler maildeki toplama katılmaz).
-        await _emailService.SendOrderStatusAsync(order.Id, order.Status);
+        // (kısmi onayda reddedilen kalemler maildeki toplama katılmaz). Sipariş hâlâ
+        // beklerken mail atılmaz — karar henüz tamamlanmamıştır.
+        if (hepsiKararaBaglandi)
+        {
+            await _emailService.SendOrderStatusAsync(order.Id, order.Status);
+        }
     }
 
     public async Task ApproveOrderAsync(int orderId, int adminUserId)
     {
         var itemIds = await _context.OrderItems
-            .Where(i => i.OrderId == orderId)
+            .Where(i => i.OrderId == orderId && i.Status == OrderStatus.Pending)
             .Select(i => i.Id)
             .ToListAsync();
 
-        await DecideOrderAsync(orderId, itemIds, adminUserId);
+        await DecideOrderAsync(orderId, itemIds, adminUserId, new List<int>());
     }
 
     public async Task RejectOrderAsync(int orderId, int adminUserId)
     {
-        await DecideOrderAsync(orderId, new List<int>(), adminUserId);
+        var itemIds = await _context.OrderItems
+            .Where(i => i.OrderId == orderId && i.Status == OrderStatus.Pending)
+            .Select(i => i.Id)
+            .ToListAsync();
+
+        await DecideOrderAsync(orderId, new List<int>(), adminUserId, itemIds);
     }
 
     // Sadece sonuçlanmış (Reddedildi/Teslim Edildi) siparişler silinebilir

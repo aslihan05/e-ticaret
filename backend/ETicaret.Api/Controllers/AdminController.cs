@@ -85,13 +85,13 @@ public class AdminController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
-    // Kalem bazlı karar: gönderilen kalemler onaylanır, kalanlar reddedilir
+    // Kalem bazlı karar: gönderilen kalemler onaylanır/reddedilir, adı geçmeyenler beklemede kalır
     [HttpPut("orders/{id}/decide")]
     public async Task<IActionResult> DecideOrder(int id, OrderDecisionDto dto)
     {
         try
         {
-            await _orderService.DecideOrderAsync(id, dto.ApprovedItemIds, CurrentUserId);
+            await _orderService.DecideOrderAsync(id, dto.ApprovedItemIds, CurrentUserId, dto.RejectedItemIds);
             return Ok(new { message = "Sipariş kararı uygulandı." });
         }
         catch (Exception ex)

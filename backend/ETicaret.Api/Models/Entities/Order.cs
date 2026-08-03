@@ -16,6 +16,13 @@ public class Order
     public int UserId { get; set; }  // Sipariş veren
     public User User {get; set;} = null!;
 
+    // Aynı ödeme adımında (tek "Siparişi Tamamla" tıklamasında) doğan siparişleri birbirine
+    // bağlar. Sepetteki her ürün ARTIK kendi siparişini alır: admin birini onaylayıp
+    // diğerini bekletebilsin diye her biri ayrı numara, ayrı satır. Bu alan da onların
+    // aynı alışverişten geldiğini söyler — kuponun kaç kez kullanıldığı sipariş sayısıyla
+    // değil, ayrı CheckoutId sayısıyla ölçülür (3 ürün alan müşteri kuponu 3 kez kullanmış olmaz).
+    public Guid CheckoutId { get; set; }
+
     public OrderStatus Status {get; set;} = OrderStatus.Pending;
 
     public DateTime CreatedAt {get; set; }

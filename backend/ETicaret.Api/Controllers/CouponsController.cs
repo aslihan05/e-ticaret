@@ -108,13 +108,20 @@ public class CouponsController : ControllerBase
                 c.PerUserLimit,
                 EndsAt = c.EndsAt,
                 KisiyeOzel = c.AssignedUsers.Any(),
-                ToplamKullanim = _context.Orders.Count(o => o.CouponId == c.Id
-                    && o.Status != OrderStatus.Cancelled
-                    && o.Status != OrderStatus.Rejected),
-                KendiKullanimim = _context.Orders.Count(o => o.CouponId == c.Id
-                    && o.UserId == userId
-                    && o.Status != OrderStatus.Cancelled
-                    && o.Status != OrderStatus.Rejected)
+                // Sayım ALIŞVERİŞ (CheckoutId) bazında: sepetteki her ürün ayrı sipariş
+                // doğurduğu için sipariş saymak, 3 ürün alan müşteriyi kuponu 3 kez
+                // kullanmış gösterip kuponu listeden düşürürdü.
+                ToplamKullanim = _context.Orders
+                    .Where(o => o.CouponId == c.Id
+                        && o.Status != OrderStatus.Cancelled
+                        && o.Status != OrderStatus.Rejected)
+                    .Select(o => o.CheckoutId).Distinct().Count(),
+                KendiKullanimim = _context.Orders
+                    .Where(o => o.CouponId == c.Id
+                        && o.UserId == userId
+                        && o.Status != OrderStatus.Cancelled
+                        && o.Status != OrderStatus.Rejected)
+                    .Select(o => o.CheckoutId).Distinct().Count()
             })
             .ToListAsync();
 
@@ -162,10 +169,16 @@ public class CouponsController : ControllerBase
                 EndsAt = c.EndsAt,
                 c.IsActive,
                 CreatedAt = DateTime.SpecifyKind(c.CreatedAt, DateTimeKind.Utc),
-                // Kullanım sayısı kuponda tutulmuyor, siparişlerden sayılıyor
-                UsedCount = _context.Orders.Count(o => o.CouponId == c.Id
-                    && o.Status != OrderStatus.Cancelled
-                    && o.Status != OrderStatus.Rejected)
+                // Kullanım sayısı kuponda tutulmuyor, siparişlerden sayılıyor. Sepetteki her
+                // ürün ayrı sipariş doğurduğu için sayım ALIŞVERİŞ (CheckoutId) bazındadır —
+                // limitleri uygulayan CouponService.KullanimSayisiAsync ile aynı ölçü.
+                UsedCount = _context.Orders
+                    .Where(o => o.CouponId == c.Id
+                        && o.Status != OrderStatus.Cancelled
+                        && o.Status != OrderStatus.Rejected)
+                    .Select(o => o.CheckoutId)
+                    .Distinct()
+                    .Count()
             })
             .ToListAsync();
 

@@ -49,12 +49,13 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 /* ===== Siparişler ===== */
 
 // Duruma göre gösterilecek işlem butonları:
-// Bekliyor -> Seçilileri Onayla / Tümünü Reddet, Onaylandı -> Kargoya Ver,
+// Bekliyor -> Onayla / Reddet, Onaylandı -> Kargoya Ver,
 // Kargoda -> Teslim Edildi, Reddedildi/Teslim Edildi -> Sil
+// Her sipariş artık tek ürün taşıdığı için kalem seçmeye gerek yok: tek Onayla / Reddet yeter.
 function orderActions(o) {
     if (o.status === 0) {
-        return `<button class="btn-approve" data-id="${o.id}">Seçilileri Onayla</button>
-                <button class="btn-reject" data-id="${o.id}">Tümünü Reddet</button>`;
+        return `<button class="btn-approve" data-id="${o.id}">Onayla</button>
+                <button class="btn-reject" data-id="${o.id}">Reddet</button>`;
     }
     if (o.status === 1) return `<button class="btn-status" data-id="${o.id}" data-status="3">Kargoya Ver</button>`;
     if (o.status === 3) return `<button class="btn-status" data-id="${o.id}" data-status="4">Teslim Edildi</button>`;
@@ -92,12 +93,10 @@ async function loadAdminOrders() {
         // Reddedilen kalemler toplama katılmaz; bekleyen siparişte kalemler seçilebilir
         const total = o.orderItems.filter(i => i.status !== 2)
             .reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-        const items = o.status === 0
-            ? o.orderItems.map(i =>
-                `<label class="item-pick"><input type="checkbox" class="item-check" value="${i.id}" checked> ${esc(i.product.name)} ×${i.quantity}</label>`).join("")
-            : o.orderItems.map(i => i.status === 2
-                ? `<span class="item-rejected">${esc(i.product.name)} ×${i.quantity}</span>`
-                : `${esc(i.product.name)} ×${i.quantity}`).join(", ");
+        // Her sipariş tek ürün taşır; ürün adı düz yazılır. Reddedilen kalem üstü çizili gösterilir.
+        const items = o.orderItems.map(i => i.status === 2
+            ? `<span class="item-rejected">${esc(i.product.name)} ×${i.quantity}</span>`
+            : `${esc(i.product.name)} ×${i.quantity}`).join(", ");
         // Telefon ve adres artık ayrı sütunlarda (eski siparişlerde boş olabilir)
         const phone = esc(o.phone || "-");
         const address = o.recipientName
@@ -248,10 +247,8 @@ document.getElementById("admin-orders").addEventListener("click", async (e) => {
     try {
         let result;
         if (approve) {
-            // İşaretli kalemler onaylanır, işaretsiz kalanlar reddedilir
-            const ids = [...approve.closest("tr").querySelectorAll(".item-check:checked")]
-                .map(cb => Number(cb.value));
-            result = await apiPut(`/admin/orders/${approve.dataset.id}/decide`, { approvedItemIds: ids });
+            // Sipariş tek ürün taşıdığı için siparişin tamamı onaylanır
+            result = await apiPut(`/admin/orders/${approve.dataset.id}/status`, { status: 1 });
         } else if (reject) {
             result = await apiPut(`/admin/orders/${reject.dataset.id}/reject`, {});
         } else if (statusBtn) {
@@ -1528,10 +1525,42 @@ function statusClass(code) {
 // yoksa reddedildi mi" sorusunu koda bakmadan cevaplayabilsin.
 function sonucMetni(code) {
     if (code == null) return "";
-    if (code >= 500) return `başarısız — sunucu hatası (${code})`;
-    if (code >= 400) return `reddedildi (${code})`;
-    if (code >= 200 && code < 300) return `başarılı (${code})`;
-    return `(${code})`;
+    const [, aciklama] = durumMetni(code);
+    return aciklama;
+}
+
+// Durum sütununda kodun kendisi yerine ne anlama geldiği yazsın diye:
+// sık görülen kodların kısa etiketi + üzerine gelince görünen uzun açıklaması.
+const DURUM_SOZLUGU = {
+    200: ["Başarılı", "İstek sorunsuz tamamlandı, veri döndü."],
+    201: ["Oluşturuldu", "Yeni kayıt başarıyla oluşturuldu."],
+    204: ["Başarılı (içerik yok)", "İşlem tamamlandı, geri döndürülecek veri yok (genelde silme)."],
+    301: ["Kalıcı yönlendirme", "Adres kalıcı olarak başka bir yere taşınmış."],
+    302: ["Yönlendirme", "İstek geçici olarak başka bir adrese yönlendirildi."],
+    304: ["Değişmemiş", "İçerik değişmediği için tarayıcıdaki kopya kullanıldı."],
+    400: ["Geçersiz istek", "Gönderilen bilgiler eksik ya da hatalı."],
+    401: ["Giriş gerekli", "Kullanıcı giriş yapmamış ya da oturumu (token) geçersiz/süresi dolmuş."],
+    403: ["Yetki yok", "Kullanıcı giriş yapmış ama bu işlemi yapmaya yetkisi yok."],
+    404: ["Bulunamadı", "İstenen kayıt ya da adres mevcut değil."],
+    405: ["İzin verilmeyen yöntem", "Bu adrese bu türde bir istek yapılamaz."],
+    409: ["Çakışma", "Kayıt zaten var ya da mevcut durumla çelişiyor."],
+    422: ["Doğrulama hatası", "Veriler biçim olarak doğru ama kurallara uymuyor."],
+    429: ["Çok fazla istek", "Kısa sürede çok istek gönderildi, geçici olarak engellendi."],
+    500: ["Sunucu hatası", "Sunucu tarafında beklenmeyen bir hata oluştu."],
+    502: ["Geçersiz yanıt", "Sunucu, bağlı olduğu başka bir servisten geçersiz yanıt aldı."],
+    503: ["Servis kapalı", "Sunucu şu an isteğe cevap veremiyor."],
+    504: ["Zaman aşımı", "Sunucu yanıt vermesi gereken süre içinde cevap dönmedi."]
+};
+
+// [kısa etiket, uzun açıklama] — sözlükte olmayan kodlar için sınıfına göre genel karşılık.
+function durumMetni(code) {
+    if (code == null) return ["Bilinmiyor", "Bu kayıt için durum bilgisi yok."];
+    if (DURUM_SOZLUGU[code]) return DURUM_SOZLUGU[code];
+    if (code >= 500) return ["Sunucu hatası", "Sunucu tarafında bir hata oluştu."];
+    if (code >= 400) return ["Reddedildi", "İstek kabul edilmedi."];
+    if (code >= 300) return ["Yönlendirme", "İstek başka bir adrese yönlendirildi."];
+    if (code >= 200) return ["Başarılı", "İstek başarıyla tamamlandı."];
+    return ["Bilgi", "Bilgilendirme yanıtı."];
 }
 
 let adminLogs = [];
@@ -1561,8 +1590,12 @@ function renderAdminLogs() {
     // kim ne yaptı, hangi kaynak üzerinde ve hangi sonuçla. Ürün işlemleri "hangi ürün"
     // bilgisiyle backend'de ayrıntılı loglanır; hata kayıtlarında istisna mesajı da eklenir.
     const rows = logs.map(l => {
+        // Rozette kodun kendisi değil ne anlama geldiği yazar; teknik karşılığı (kod)
+        // küçük punto ile altında durur, tam açıklama ise tooltip'te.
+        const [etiket, aciklama] = durumMetni(l.statusCode);
         const statusBadge = l.statusCode != null
-            ? `<span class="log-badge ${statusClass(l.statusCode)}">${l.statusCode}</span>`
+            ? `<span class="log-badge ${statusClass(l.statusCode)}" title="${esc(aciklama)}">${esc(etiket)}</span>
+               <span class="log-code" title="${esc(aciklama)}">HTTP ${l.statusCode}</span>`
             : "-";
         return `<tr class="log-row">
             <td>${l.id}</td>
@@ -1601,7 +1634,7 @@ function logAciklama(l) {
         const sonuc = sonucMetni(l.statusCode);
         const parcalar = [];
         if (yol) parcalar.push(`<span class="log-path">${esc(yol)}</span>`);
-        if (sonuc) parcalar.push(`İşlem ${esc(sonuc)}`);
+        if (sonuc) parcalar.push(esc(sonuc));
         html = parcalar.length ? parcalar.join(" — ") : "-";
     }
 
@@ -1915,9 +1948,8 @@ async function loadAnalytics() {
     // En çok harcayan müşteriler: yatay BAR grafiği (tablonun görsel karşılığı)
     const topCustChart = barChart((a.topCustomers ?? []).map(c => ({ label: c.customer, value: c.spent })), money);
 
-    // En çok harcayan müşteriler tablosu
-    const topRows = (a.topCustomers ?? []).map(c =>
-        `<tr><td><button class="customer-link" data-user-id="${c.userId}">${esc(c.customer)}</button></td><td>${c.orders}</td><td>${money(c.spent)}</td></tr>`).join("");
+    // Not: "En çok harcayan müşteriler" için ayrı tablo yok — aynı veriyi yukarıdaki
+    // yatay bar grafiği (topCustChart) zaten gösterdiği için tablo kaldırıldı.
 
     // Kategori kırılımı (adet / ciro / kâr)
     const catBreakRows = (a.categoryBreakdown ?? []).map(c =>
@@ -1955,6 +1987,14 @@ async function loadAnalytics() {
     }).join("") : "";
 
     document.getElementById("admin-analytics").innerHTML = `
+        <nav class="an-subnav" role="tablist">
+            <button type="button" class="an-tab" data-an="ozet">📈 Özet</button>
+            <button type="button" class="an-tab" data-an="grafik">📊 Grafikler</button>
+            <button type="button" class="an-tab" data-an="urun">📦 Ürün & Kategori</button>
+            <button type="button" class="an-tab" data-an="siparis">🧾 Sipariş & Kupon</button>
+        </nav>
+
+        <div class="an-panel" data-an-panel="ozet">
         <h3 class="analytics-h">Günlük Gelir & Kâr Trendi</h3>
         <div class="chart-card">${trendChart(a.trend)}</div>
 
@@ -2006,7 +2046,9 @@ async function loadAnalytics() {
             <div class="stat-card"><span>Bu Ay Yeni Müşteri</span><strong>${a.newCustomersThisMonth ?? 0}</strong></div>
             <div class="stat-card"><span>Sadık Müşteri</span><strong>${a.repeatCustomers ?? 0}</strong><span class="muted">1+ siparişli</span></div>
         </div>
+        </div>
 
+        <div class="an-panel" data-an-panel="grafik">
         <h3 class="analytics-h">Aylık Ciro & Kâr (son 12 ay)</h3>
         <div class="chart-card">${monthlyColChart}</div>
 
@@ -2028,27 +2070,49 @@ async function loadAnalytics() {
                 ${topCustChart}
             </div>
         </div>
+        </div>
 
-        ${analyticsTable("Aylık Kırılım (son 12 ay)", ["Ay", "Sipariş", "Ciro", "Kâr"], monthlyRows, "🔍 Ay ara")}
-
+        <div class="an-panel" data-an-panel="urun">
         ${analyticsTable("Kategori Kırılımı (adet / ciro / kâr)", ["Kategori", "Satılan", "Ciro", "Kâr"], catBreakRows, "🔍 Kategori ara")}
-
-        ${analyticsTable("En Çok Harcayan Müşteriler", ["Müşteri", "Sipariş", "Toplam Harcama"], topRows, "🔍 Müşteri ara")}
 
         ${analyticsTable("En Kârlı Ürünler", ["Ürün", "Satılan", "Ciro", "Kâr"], profitProdRows, "🔍 Ürün ara")}
 
         ${analyticsTable("Ürün Bazında Satış (kaç satıldı / ciro / kâr)", ["Ürün", "Satılan", "Ciro", "Kâr"], saleRows, "🔍 Ürün ara")}
 
-        ${analyticsTable("Kupon Kullanımı", ["Kupon", "Kullanım", "Toplam İndirim"], couponRows, "🔍 Kupon kodu ara")}
-
         ${analyticsTable("Düşük Stok Uyarısı (≤5)", ["Ürün", "Kategori", "Stok"], lowStockRows, "🔍 Ürün / kategori ara")}
+        </div>
+
+        <div class="an-panel" data-an-panel="siparis">
+        ${analyticsTable("Aylık Kırılım (son 12 ay)", ["Ay", "Sipariş", "Ciro", "Kâr"], monthlyRows, "🔍 Ay ara")}
+
+        ${analyticsTable("Kupon Kullanımı", ["Kupon", "Kullanım", "Toplam İndirim"], couponRows, "🔍 Kupon kodu ara")}
+        </div>
     `;
+
+    showAnalyticsSection(analyticsSection);
+}
+
+// Analiz sekmesi çok fazla grafik/tablo içerdiği için içerik gruplara bölündü.
+// Seçili grup modül düzeyinde tutulur: filtre uygulanıp rapor yeniden çizildiğinde
+// kullanıcı en baştaki gruba geri düşmez.
+let analyticsSection = "ozet";
+
+function showAnalyticsSection(which) {
+    const kok = document.getElementById("admin-analytics");
+    const hedef = kok.querySelector(`[data-an-panel="${which}"]`) ? which : "ozet";
+    analyticsSection = hedef;
+    kok.querySelectorAll(".an-tab").forEach(b => b.classList.toggle("active", b.dataset.an === hedef));
+    kok.querySelectorAll(".an-panel").forEach(p => p.classList.toggle("active", p.dataset.anPanel === hedef));
 }
 
 // Analiz sekmesindeki müşteri linkleri de modalı açsın
 document.getElementById("admin-analytics").addEventListener("click", (e) => {
     const link = e.target.closest(".customer-link");
-    if (link) openCustomerModal(Number(link.dataset.userId));
+    if (link) { openCustomerModal(Number(link.dataset.userId)); return; }
+
+    // Grup menüsü (Özet / Grafikler / Ürün & Kategori / Sipariş & Kupon)
+    const tab = e.target.closest(".an-tab");
+    if (tab) showAnalyticsSection(tab.dataset.an);
 });
 
 // Tablo başına arama: yalnızca kutunun bulunduğu tablonun satırlarını süzer.

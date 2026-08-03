@@ -111,12 +111,19 @@ public class CouponService
     }
 
     // userId null ise kuponun toplam kullanımı, doluysa o kullanıcınınki sayılır.
+    //
+    // Sayım SİPARİŞ değil ALIŞVERİŞ (CheckoutId) bazındadır: sepetteki her ürün ayrı bir
+    // sipariş doğurduğu için, 3 ürün alan müşteri kuponu tek kullandığı hâlde 3 kullanım
+    // görünürdü — tek kullanımlık kupon ilk alışverişte limitini doldururdu.
     private Task<int> KullanimSayisiAsync(int couponId, int? userId) =>
-        _context.Orders.CountAsync(o =>
-            o.CouponId == couponId
-            && (userId == null || o.UserId == userId)
-            && o.Status != OrderStatus.Cancelled
-            && o.Status != OrderStatus.Rejected);
+        _context.Orders
+            .Where(o => o.CouponId == couponId
+                && (userId == null || o.UserId == userId)
+                && o.Status != OrderStatus.Cancelled
+                && o.Status != OrderStatus.Rejected)
+            .Select(o => o.CheckoutId)
+            .Distinct()
+            .CountAsync();
 
     // Kuponun şartlarını siparişe kopyalar. İndirim tutarı yazılmaz; sipariş onu
     // kendi kalemlerinden hesaplar (bkz. Order.CalculateDiscount).

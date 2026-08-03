@@ -908,6 +908,14 @@ footer {
     font-size: 0.72rem;
     font-weight: 700;
 }
+/* Rozetin altındaki teknik karşılık: asıl bilgi etiket, kod ikincil kalsın */
+.log-code {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.68rem;
+    color: #94a3b8;
+    white-space: nowrap;
+}
 .log-info { background: #e0f2fe; color: #075985; }
 .log-warning { background: #fef3c7; color: #92400e; }
 .log-error { background: #fee2e2; color: #991b1b; }
@@ -2281,15 +2289,7 @@ body.cbot-active .layout-shop .showcase { margin-right: var(--cbot-reserve); }
 }
 .filter-panel .filter-clear { margin-top: 4px; }
 
-/* ===== Kalem bazlı sipariş kararı ===== */
-
-.item-pick {
-    display: block;
-    font-size: 0.85rem;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
+/* Reddedilmiş kalem, sipariş satırında üstü çizili gösterilir */
 .item-rejected {
     text-decoration: line-through;
     color: #9ca3af;
@@ -3494,6 +3494,15 @@ select:focus-visible,
 .success-item-info h4 a { color: #1e1b4b; text-decoration: none; }
 .success-item-info h4 a:hover { text-decoration: underline; }
 
+/* Her ürün ayrı sipariş olduğu için kalemin kendi numarası da satırda yazar */
+.success-item-no {
+    display: block;
+    font-size: 0.78rem;
+    color: #6366f1;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
 .success-item > strong { color: #1e1b4b; white-space: nowrap; }
 
 .order-success-summary {
@@ -3918,6 +3927,36 @@ select:focus-visible,
 
 .dash-panel { display: none; }
 .dash-panel.active { display: block; animation: fade-in 0.3s ease; }
+
+/* Özet içindeki grup menüsü: çok sayıda grafik/tablo dört gruba bölünür.
+   Görsel dil üstteki alt-sekmelerle aynı, ama biraz daha küçük durur. */
+.an-subnav {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin: 4px 0 18px;
+    padding: 5px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    width: fit-content;
+}
+.an-tab {
+    border: none; cursor: pointer;
+    padding: 8px 15px; border-radius: 9px;
+    font-size: 0.86rem; font-weight: 600; color: #4b4a6a;
+    background: transparent;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.an-tab:hover { color: #1e1b4b; background: rgba(255, 255, 255, 0.6); }
+.an-tab.active {
+    color: #fff;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.an-panel { display: none; }
+.an-panel.active { display: block; animation: fade-in 0.3s ease; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* Özet sekmesindeki filtre çubuğu cam görünsün */

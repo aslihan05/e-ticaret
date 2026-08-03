@@ -295,9 +295,18 @@ function siparisTamamlandiGoster(siparis) {
             <div class="success-item-info">
                 <h4><a href="product.html?id=${it.productId}">${esc(it.name)}</a></h4>
                 <span class="muted">${it.quantity} adet × ${it.unitPrice} TL</span>
+                <span class="success-item-no">Sipariş no #${it.orderId}</span>
             </div>
             <strong>${it.lineTotal} TL</strong>
         </div>`).join("");
+
+    // Her ürün kendi sipariş numarasını alır: tek üründe "Sipariş no #5", birden çok
+    // üründe hepsi listelenir — müşteri hangi numaranın hangi ürün olduğunu kalem
+    // satırlarında da görür ve tek bir ürünü iptal ettirmek istediğinde numarayı bilir.
+    const nolar = siparis.orderIds ?? [];
+    const numaraMetni = nolar.length === 1
+        ? `Sipariş no <strong>#${nolar[0]}</strong>`
+        : `${nolar.length} ayrı sipariş oluştu: ${nolar.map(n => `<strong>#${n}</strong>`).join(", ")}`;
 
     const indirimSatiri = siparis.discount > 0
         ? `<div class="summary-line summary-discount">
@@ -311,7 +320,7 @@ function siparisTamamlandiGoster(siparis) {
             <div class="order-success-head">
                 <div class="order-success-check" aria-hidden="true">✓</div>
                 <h3>Siparişin alındı! 🎉</h3>
-                <p class="muted">Sipariş no <strong>#${siparis.id}</strong> — admin onayından sonra hazırlanacak.</p>
+                <p class="muted">${numaraMetni} — admin onayından sonra hazırlanacak.</p>
             </div>
 
             <div class="success-items">${kalemler}</div>

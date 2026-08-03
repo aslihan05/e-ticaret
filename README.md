@@ -15,6 +15,10 @@
 - **Sepet**: Sepete ekleme (JWT korumalı), adet güncelleme, satır silme, sepet rozeti
 - **Sipariş akışı**: Sepetten sipariş oluşturma (checkout), sipariş anındaki fiyatın saklanması; siparişler admin onayına düşer, **onayda stok otomatik düşer**; kullanıcı **sipariş geçmişi** sayfasından durumunu takip eder. Sipariş sonrası **"siparişin alındı" ekranında** satın alınan ürünlerin görseli, adı, adedi ve tutarıyla birlikte sipariş özeti gösterilir
 - **Hediye kutusu daveti**: Menüdeki 🎁 Hediye Kutusu bağlantısı, müşteri açmayı unutmasın diye arada bir hafifçe sallanır ve yumuşak bir parıltıyla nefes alır (`prefers-reduced-motion` tercihine saygılı)
+- **Yapay zekâ destekli müşteri asistanı (chatbot)**: Sağ alttaki destek butonundan açılan sohbet kutusu. Hazır cevap veren bir SSS botu değil, **tool use** ile çalışır: soruyu cevaplamak için sunucudaki araçları çağırıp gerçek veritabanı verisiyle konuşur.
+  - **Okuma araçları**: kendi siparişleri, kuponları, sepeti, **favori listesi**, ürün arama, kategori listesi, filtreli/sıralı ürün listesi
+  - **Yazma araçları**: sepete ekleme/çıkarma, **favorilere ekleme/çıkarma**, sipariş oluşturma, sipariş iptali. Sepet ve favori işlemleri geri alınabilir olduğu için onaysız yapılır; **sipariş verme ve iptal için müşteriden açık onay istenir**
+  - **Güvenlik**: Araçların hiçbiri kullanıcı kimliğini parametre olarak almaz — kimlik her zaman JWT'den gelir, yani müşteri sohbete id yazarak başkasının verisine ulaşamaz (IDOR yok). Stok **adedi**, maliyet/kâr gibi kapalı bilgiler hiçbir araçtan dönmez; iş kuralları mevcut servislerden (`OrderService`, `StockService`) yeniden kullanılır, bot için ikinci bir kural seti yoktur
 - **Admin paneli**: Sipariş onaylama/reddetme, kullanıcı yönetimi, istek logları, satış istatistikleri — hepsi `admin.html` arayüzünden yönetilir
 - **Loglama**: Değişiklik yapan tüm isteklerin middleware ile otomatik kaydı. Admin log tablosu dışarıdan bakan biri için okunur tasarlanmıştır: her kaydın **Açıklama** sütununda kim/neyi/hangi sonuçla yaptığı düz Türkçe yazar; işlevsiz **Seviye** sütunu kaldırılmış, önem bilgisi renkli **Durum** (HTTP kodu) rozetiyle verilir
 
@@ -158,6 +162,7 @@ E-Ticaret/
 | Sepet | `GET/POST /api/cart`, `PUT/DELETE /api/cart/{id}` (giriş gerektirir) |
 | Kuponlar | `POST /api/coupons/apply` (sepette önizleme — tutar istemciden alınmaz, sunucu kendi sepetinden hesaplar), `GET /api/coupons` (Admin), `POST /api/coupons` (Admin), `PUT /api/coupons/{id}` (Admin), `DELETE /api/coupons/{id}` (Admin — silmez, kapatır) |
 | Siparişler | `POST /api/orders` (checkout; `couponCode` opsiyonel), `GET /api/orders` (kendi geçmişi) |
+| Chatbot | `POST /api/chatbot` (giriş gerektirir) — gövde: `{ messages: [{ role, content }] }`, cevap: `{ reply }`. Araç çağrıları tamamen sunucuda yürütülür, istemciye taşınmaz |
 | Admin | `GET /api/admin/orders`, `PUT /api/admin/orders/{id}/approve`, `PUT /api/admin/orders/{id}/reject`, `GET/DELETE /api/admin/users`, `GET /api/admin/logs`, `GET /api/admin/analytics` |
 
 Tüm uç noktaların tam şeması (istek/cevap gövdeleri dahil) için uygulamayı çalıştırıp `/swagger` adresine bakabilirsin.

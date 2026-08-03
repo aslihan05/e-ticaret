@@ -82,6 +82,13 @@ public class ChatbotTools
         },
         new JsonObject
         {
+            ["name"] = "favorilerimiGetir",
+            ["description"] = "Giriş yapmış müşterinin KENDİ favori (beğendiklerim) listesini döndürür: "
+                + "ürün adı, güncel/indirimli fiyatı, stok durumu ve favoriye eklenme tarihi. "
+                + "Müşteri 'favorilerimde ne var', 'beğendiklerim neler' diye sorduğunda kullan."
+        },
+        new JsonObject
+        {
             ["name"] = "urunleriListele",
             ["description"] = "Mağazadaki satıştaki ürünleri kategoriye, fiyat aralığına ve indirim "
                 + "durumuna göre süzüp sıralı biçimde döndürür (ilk 10). İsimle arama YAPMAZ (onun için "
@@ -170,11 +177,54 @@ public class ChatbotTools
         },
         new JsonObject
         {
+            ["name"] = "favoriyeEkle",
+            ["description"] = "Giriş yapmış müşterinin favori listesine ürün ekler. Ürün adıyla eşleşen "
+                + "tek bir satıştaki ürün bulunursa eklenir; birden fazla ürün eşleşirse hangisi olduğunu "
+                + "sorman için bilgilendirir. Müşteri 'bunu favorilere ekle', 'beğendiklerime kaydet' "
+                + "dediğinde kullan. Geri alınabilir bir işlemdir, önceden onay gerekmez.",
+            ["parameters"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["urunAdi"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["description"] = "Favorilere eklenecek ürünün adı."
+                    }
+                },
+                ["required"] = new JsonArray { "urunAdi" }
+            }
+        },
+        new JsonObject
+        {
+            ["name"] = "favoridenCikar",
+            ["description"] = "Giriş yapmış müşterinin favori listesinden, adıyla eşleşen ürünü çıkarır. "
+                + "Geri alınabilir (müşteri tekrar ekleyebilir).",
+            ["parameters"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["urunAdi"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["description"] = "Favorilerden çıkarılacak ürünün adı."
+                    }
+                },
+                ["required"] = new JsonArray { "urunAdi" }
+            }
+        },
+        new JsonObject
+        {
             ["name"] = "siparisVer",
             ["description"] = "Giriş yapmış müşterinin sepetindeki ürünlerden sipariş oluşturur. Teslimat "
                 + "bilgisi müşterinin KAYITLI profil adresinden alınır (adres/telefon eksikse hata döner, "
-                + "müşteri Hesabım sayfasından tamamlamalı). ÖNEMLİ: Bu aracı çağırmadan ÖNCE müşteriye "
-                + "sepet tutarını özetleyip açık onay al ('siparişi onaylıyor musunuz?'). Onay alınmadan çağırma.",
+                + "müşteri Hesabım sayfasından tamamlamalı). Sepetteki HER ÜRÜN ayrı bir sipariş numarası "
+                + "alır (her biri ayrı onaylanıp ayrı iptal edilebilsin diye); yanıttaki 'siparisNolari' "
+                + "listesinde hangi numaranın hangi ürüne ait olduğunu müşteriye söyle. ÖNEMLİ: Bu aracı "
+                + "çağırmadan ÖNCE müşteriye sepet tutarını özetleyip açık onay al "
+                + "('siparişi onaylıyor musunuz?'). Onay alınmadan çağırma.",
             ["parameters"] = new JsonObject
             {
                 ["type"] = "object",
@@ -219,6 +269,7 @@ public class ChatbotTools
             "siparislerimiGetir" => await SiparislerimiGetirAsync(userId),
             "kuponlarimiGetir" => await KuponlarimiGetirAsync(userId),
             "sepetimiGetir" => await SepetimiGetirAsync(userId),
+            "favorilerimiGetir" => await FavorilerimiGetirAsync(userId),
             "urunAra" => await UrunAraAsync(input["arama"]?.GetValue<string>() ?? ""),
             "kategorileriGetir" => await KategorileriGetirAsync(),
             "urunleriListele" => await UrunleriListeleAsync(
@@ -230,6 +281,8 @@ public class ChatbotTools
             "sepeteEkle" => await SepeteEkleAsync(userId,
                 input["urunAdi"]?.GetValue<string>() ?? "", IntAl(input["adet"]) ?? 1),
             "sepettenCikar" => await SepettenCikarAsync(userId, input["urunAdi"]?.GetValue<string>() ?? ""),
+            "favoriyeEkle" => await FavoriyeEkleAsync(userId, input["urunAdi"]?.GetValue<string>() ?? ""),
+            "favoridenCikar" => await FavoridenCikarAsync(userId, input["urunAdi"]?.GetValue<string>() ?? ""),
             "siparisVer" => await SiparisVerAsync(userId, input["kuponKodu"]?.GetValue<string>()),
             "siparisIptalEt" => await SiparisIptalEtAsync(userId, IntAl(input["siparisNo"]) ?? 0),
             // Bilinmeyen araç: modele hata döndür ki uydurmasın.
@@ -374,6 +427,53 @@ public class ChatbotTools
             urunSayisi = satirlar.Sum(s => s.adet),
             urunler = satirlar
         });
+    }
+
+    private async Task<string> FavorilerimiGetirAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+
+        // FavoritesController.GetMine ile aynı kapsam: pasif (satıştan kaldırılmış) ürünler
+        // listelenmez, en son eklenen üstte.
+        var satirlar = await _context.Favorites
+            .Where(f => f.UserId == userId && f.Product.IsActive)
+            .OrderByDescending(f => f.CreatedAt)
+            .Select(f => new
+            {
+                f.Product.Id,
+                Urun = f.Product.Name,
+                Kategori = f.Product.Category.Name,
+                Fiyat = f.Product.Price,
+                Indirimli = f.Product.DiscountPrice != null && f.Product.DiscountPrice < f.Product.Price
+                    && (f.Product.DiscountStart == null || f.Product.DiscountStart <= now)
+                    && (f.Product.DiscountEnd == null || f.Product.DiscountEnd >= now),
+                IndirimliFiyat = f.Product.DiscountPrice,
+                EklenmeTarihi = f.CreatedAt
+            })
+            .ToListAsync();
+
+        if (satirlar.Count == 0)
+        {
+            return Json(new { mesaj = "Müşterinin favori listesi boş." });
+        }
+
+        var sonuc = new List<object>();
+        foreach (var s in satirlar)
+        {
+            // Stok SAYISINI sızdırmıyoruz; yalnızca var/yok (diğer ürün araçlarıyla aynı gizlilik).
+            int musait = await _stockService.AvailableForUserAsync(s.Id, userId: 0);
+            sonuc.Add(new
+            {
+                urun = s.Urun,
+                kategori = s.Kategori,
+                fiyat = s.Fiyat,
+                indirimliFiyat = s.Indirimli ? s.IndirimliFiyat : (decimal?)null,
+                stokDurumu = musait > 0 ? "var" : "yok",
+                eklenmeTarihi = DateTime.SpecifyKind(s.EklenmeTarihi, DateTimeKind.Utc)
+            });
+        }
+
+        return Json(sonuc);
     }
 
     private async Task<string> UrunAraAsync(string arama)
@@ -691,6 +791,55 @@ public class ChatbotTools
         return Json(new { mesaj = $"{ad} sepetten çıkarıldı." });
     }
 
+    private async Task<string> FavoriyeEkleAsync(int userId, string urunAdi)
+    {
+        var (urun, hata) = await UrunuCozAsync(urunAdi);
+        if (urun == null) return Json(new { hata });
+
+        // FavoritesController.Add gibi: zaten favorideyse hata değil, istenen sonuç zaten sağlanmış.
+        if (await _context.Favorites.AnyAsync(f => f.UserId == userId && f.ProductId == urun.Id))
+        {
+            return Json(new { mesaj = $"{urun.Name} zaten favorilerinizde.", urun = urun.Name });
+        }
+
+        _context.Favorites.Add(new Favorite
+        {
+            UserId = userId,
+            ProductId = urun.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        return Json(new { mesaj = $"{urun.Name} favorilere eklendi.", urun = urun.Name });
+    }
+
+    private async Task<string> FavoridenCikarAsync(int userId, string urunAdi)
+    {
+        urunAdi = (urunAdi ?? "").Trim();
+        if (urunAdi.Length == 0) return Json(new { hata = "Ürün adı boş olamaz." });
+
+        // Sepetten çıkarmadaki mantık: eşleşme favori listesinin İÇİNDE aranır, böylece
+        // müşterinin listesinde olmayan bir ürün adı yüzünden yanlış kayıt silinmez.
+        var satirlar = await _context.Favorites
+            .Include(f => f.Product)
+            .Where(f => f.UserId == userId && f.Product.Name.Contains(urunAdi))
+            .ToListAsync();
+
+        if (satirlar.Count == 0)
+            return Json(new { hata = $"Favorilerinizde '{urunAdi}' ile eşleşen ürün yok." });
+
+        if (satirlar.Count > 1)
+        {
+            var adlar = string.Join(", ", satirlar.Select(s => s.Product.Name));
+            return Json(new { hata = $"Favorilerde birden fazla ürün eşleşti ({adlar}). Hangisini kastettiğini müşteriye sor." });
+        }
+
+        var ad = satirlar[0].Product.Name;
+        _context.Favorites.Remove(satirlar[0]);
+        await _context.SaveChangesAsync();
+        return Json(new { mesaj = $"{ad} favorilerden çıkarıldı." });
+    }
+
     private async Task<string> SiparisVerAsync(int userId, string? kuponKodu)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -721,16 +870,23 @@ public class ChatbotTools
         try
         {
             // Tüm iş kuralları (boş sepet, stok yetersizliği, kupon geçerliliği) OrderService'te.
-            var order = await _orderService.CreateOrderFromCartAsync(userId, dto);
+            var orders = await _orderService.CreateOrderFromCartAsync(userId, dto);
 
-            decimal araToplam = order.OrderItems.Sum(i => i.UnitPrice * i.Quantity);
-            decimal indirim = order.CalculateDiscount(araToplam);
+            decimal araToplam = orders.Sum(o => o.OrderItems.Sum(i => i.UnitPrice * i.Quantity));
+            decimal indirim = orders.Sum(o => o.CalculateDiscount(o.OrderItems.Sum(i => i.UnitPrice * i.Quantity)));
 
             return Json(new
             {
                 mesaj = "Siparişiniz alındı ve onay için mağazaya iletildi.",
-                siparisNo = order.Id,
-                durum = DurumTr(order.Status),
+                // Sepetteki her ürün ayrı numara alır; bot hepsini söylemeli ki müşteri
+                // sonradan tek bir ürünü iptal ettirmek istediğinde numarayı bilsin.
+                siparisNolari = orders.Select(o => new
+                {
+                    no = o.Id,
+                    urun = o.OrderItems.First().Product.Name,
+                    adet = o.OrderItems.First().Quantity
+                }),
+                durum = DurumTr(orders[0].Status),
                 araToplam,
                 indirim,
                 odenecek = araToplam - indirim,

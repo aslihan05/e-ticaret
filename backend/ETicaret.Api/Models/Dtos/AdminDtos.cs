@@ -37,10 +37,13 @@ public class OrderStatusDto
     public OrderStatus Status { get; set; }
 }
 
-// Kalem bazlı karar: listedekiler onaylanır, listede olmayan kalemler reddedilir
+// Kalem bazlı karar: yalnızca listelerde adı geçen kalemler karara bağlanır.
+// Hiçbir listede olmayan kalem BEKLEMEDE kalır — admin aynı siparişin bir ürününü
+// onaylayıp diğerini sonraya bırakabilsin diye (eskiden seçilmeyen kalem reddediliyordu).
 public class OrderDecisionDto
 {
     public List<int> ApprovedItemIds { get; set; } = new();
+    public List<int> RejectedItemIds { get; set; } = new();
 }
 
 // Admin'in kullanıcı ekleme/güncelleme formu; güncellemede boş/null bırakılan alanlar değişmez.

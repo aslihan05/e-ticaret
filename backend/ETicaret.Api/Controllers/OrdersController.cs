@@ -32,33 +32,37 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var order = await _orderService.CreateOrderFromCartAsync(CurrentUserId, dto);
+            // Sepetteki her ürün ayrı bir sipariş doğurur; yanıt bu alışverişin TAMAMINI
+            // özetler (toplamlar) ve her kalemin kendi sipariş numarasını taşır — müşteri
+            // "hangi numara hangi ürün" sorusunu tamamlandı ekranında görebilsin diye.
+            var orders = await _orderService.CreateOrderFromCartAsync(CurrentUserId, dto);
 
             // Ham Order dönmek, içindeki Product entity'leriyle maliyet/stok/indirim bilgisini
             // sızdırıyordu. Frontend'in ihtiyacı olan tek şey siparişin oluştuğu bilgisi:
-            decimal subtotal = order.OrderItems.Sum(i => i.UnitPrice * i.Quantity);
-            decimal indirim = order.CalculateDiscount(subtotal);
+            decimal subtotal = orders.Sum(o => AraToplam(o));
+            decimal indirim = orders.Sum(o => o.CalculateDiscount(AraToplam(o)));
 
             return Ok(new
             {
-                order.Id,
-                order.Status,
-                CreatedAt = DateTime.SpecifyKind(order.CreatedAt, DateTimeKind.Utc),
+                OrderIds = orders.Select(o => o.Id),
+                Status = orders[0].Status,
+                CreatedAt = DateTime.SpecifyKind(orders[0].CreatedAt, DateTimeKind.Utc),
                 Subtotal = subtotal,
-                order.CouponCode,
+                orders[0].CouponCode,
                 Discount = indirim,
                 Total = subtotal - indirim,
                 // "Siparişiniz alındı" ekranında ne satın alındığını göstermek için kalemler:
                 // ad + görsel + adet + birim/satır fiyatı. Maliyet/stok gibi iç alanlar sızmaz.
-                Items = order.OrderItems.Select(i => new
+                Items = orders.SelectMany(o => o.OrderItems.Select(i => new
                 {
+                    OrderId = o.Id,
                     i.ProductId,
                     Name = i.Product.Name,
                     ImageUrl = i.Product.ImageUrl,
                     i.Quantity,
                     i.UnitPrice,
                     LineTotal = i.UnitPrice * i.Quantity
-                })
+                }))
             });
         }
         catch (Exception ex)
