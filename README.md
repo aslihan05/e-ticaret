@@ -149,6 +149,19 @@ E-Ticaret/
    ```
    Alternatif: VS Code **Live Server** eklentisiyle `frontend/index.html`'i aç. (Not: Live Server, VS Code'da açık olan klasörü kök alır — proje kökü açıksa adres `http://127.0.0.1:5500/frontend/index.html` olur.)
 
+### Canlıya yayın
+
+Canlı ortamın gizli bilgileri `backend/ETicaret.Api/appsettings.Production.json` dosyasında tutulur. Bu dosya `.gitignore`'dadır, repoda **yoktur**; yayın yapacak makinede elle oluşturulur:
+
+```json
+{
+  "ConnectionStrings": { "DefaultConnection": "<canlı veritabanı bağlantısı>" },
+  "Jwt": { "Key": "<en az 32 karakterlik gizli anahtar>" }
+}
+```
+
+`dotnet publish -c Release -o ../yayin` bu dosyayı çıktıya kopyalar; ASP.NET Core, Production ortamında onu `appsettings.json`'ın üzerine otomatik yükler. Frontend de aynı yayına `wwwroot` olarak girer, yani tek site hem sayfaları hem `/api`'yi sunar.
+
 ## API uç noktaları (özet)
 
 | Alan | Uç noktalar |

@@ -28,3 +28,7 @@ Thumbs.db
 
 # Kisisel notlar (repoya girmez)
 SUNUM-REHBERI.md
+
+# Canlı ortam gizli bilgileri (DB şifresi, JWT anahtarı) — asla repoya girmez.
+# Yayında (dotnet publish) çıktıya kopyalanır; ASP.NET Core Production ortamında otomatik yükler.
+appsettings.Production.json

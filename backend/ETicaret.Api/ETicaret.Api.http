@@ -1,6 +1,11 @@
 @ETicaret.Api_HostAddress = http://localhost:5113
 
-GET {{ETicaret.Api_HostAddress}}/weatherforecast/
+GET {{ETicaret.Api_HostAddress}}/api/categories
+Accept: application/json
+
+###
+
+GET {{ETicaret.Api_HostAddress}}/api/products/browse?page=1&pageSize=12
 Accept: application/json
 
 ###
